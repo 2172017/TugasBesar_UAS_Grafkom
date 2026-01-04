@@ -1,19 +1,45 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+// import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 const scene = new THREE.Scene();
 
 /*JANGAN SENTUH!
 /*SKYBOX (PNG)*/
 const cubeTextureLoader = new THREE.CubeTextureLoader();
-scene.background = cubeTextureLoader.load([
-  '/skybox/px.png',
-  '/skybox/nx.png',
-  '/skybox/py.png',
-  '/skybox/ny.png',
-  '/skybox/pz.png',
-  '/skybox/nz.png'
-]);
+// scene.background = cubeTextureLoader.load([
+//   '/skybox/px.png',
+//   '/skybox/nx.png',
+//   '/skybox/py.png',
+//   '/skybox/ny.png',
+//   '/skybox/pz.png',
+//   '/skybox/nz.png'
+// ]);
+
+const skyTexture = cubeTextureLoader.load([
+   '/skybox/px.png',
+   '/skybox/nx.png',
+   '/skybox/py.png',
+   '/skybox/ny.png',
+   '/skybox/pz.png',
+   '/skybox/nz.png'
+ ]);
+
+const skyShader = THREE.ShaderLib.cube;
+const skyMaterial = new THREE.ShaderMaterial({
+  fragmentShader: skyShader.fragmentShader,
+  vertexShader: skyShader.vertexShader,
+  uniforms: THREE.UniformsUtils.clone(skyShader.uniforms),
+  side: THREE.DoubleSide, // <--- INI KUNCINYA (Render Dalam & Luar)
+  depthWrite: false       // Agar langit selalu di belakang objek lain
+});
+
+// Masukkan texture yang sudah di-load ke material
+skyMaterial.uniforms.tCube.value = skyTexture;
+
+// 3. Buat Kotak Raksasa untuk Langit
+const skyBox = new THREE.Mesh(new THREE.BoxGeometry(1000, 1000, 1000), skyMaterial);
+scene.add(skyBox);
 
 /*CAMERA*/
 const camera = new THREE.PerspectiveCamera(
@@ -23,15 +49,23 @@ const camera = new THREE.PerspectiveCamera(
   1000
 );
 
+/* --- TAMBAHAN: REAR CAMERA (KACA SPION) --- */
+const rearCamera = new THREE.PerspectiveCamera(
+   40, 
+   2.5,
+   0.1, 
+   1000
+ );
+
 /*RENDERER*/
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-/*CONTROLS*/
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.maxPolarAngle = Math.PI / 2.2;
+// /*CONTROLS*/
+// const controls = new OrbitControls(camera, renderer.domElement);
+// controls.enableDamping = true;
+// controls.maxPolarAngle = Math.PI / 2.2;
 
 /*MAU UBAH SOK DIMANGGA
 /*LIGHTING*/
@@ -65,7 +99,8 @@ groundTexture.colorSpace = THREE.SRGBColorSpace;
 const groundMaterial = new THREE.MeshStandardMaterial({
   map: groundTexture,
   roughness: 1,
-  metalness: 0
+  metalness: 0,
+  side: THREE.DoubleSide
 });
 
 /*
@@ -137,7 +172,8 @@ function createParkingSlot(x, z, isObjective = false) {
   const material = new THREE.MeshStandardMaterial({
     color: isObjective ? 0x00ff00 : 0x555555,
     emissive: isObjective ? 0x00ff00 : 0x000000,
-    emissiveIntensity: isObjective ? 1.5 : 0
+    emissiveIntensity: isObjective ? 1.5 : 0,
+    side: THREE.DoubleSide
   });
 
   const slot = new THREE.Mesh(geometry, material);
@@ -287,20 +323,233 @@ for (let i = 0; i < slotCount; i++) {
   if (isObjective) targetSlot = slot;
 }
 
+/* ======================================================
+   CAR MODEL
+====================================================== */
+
+let playerCar = null;
+let carWheels = []; // Array untuk menyimpan mesh roda
+
+const gltfLoader = new GLTFLoader();
+gltfLoader.load(
+   'car_model/GLB format/sedan-sports.glb', // GANTI DENGAN NAMA FILE KAMU
+   (gltf) => {
+     playerCar = gltf.scene;
+ 
+     /* 1. ATUR POSISI & UKURAN */
+     // Kenney models biasanya hadap ke sumbu Z positif atau negatif, kita putar balik
+     playerCar.rotation.y = Math.PI; 
+     
+     playerCar.position.set(0, 0, 16); // Posisi awal di aspal
+     playerCar.scale.set(3, 3, 3); // Kenney models itu KECIL SEKALI (Low Poly), jadi harus di-scale besar
+ 
+     /* 2. ENABLE BAYANGAN & CARI RODA */
+     playerCar.traverse((child) => {
+       if (child.isMesh) {
+         child.castShadow = true;
+         child.receiveShadow = true;
+
+         if (child.material) {
+            child.material.side = THREE.DoubleSide;
+         }
+
+         if (child.name.toLowerCase().includes('wheel')) {
+            carWheels.push(child);
+         }
+         
+         // Cek Nama Mesh untuk Roda (Debugging)
+         // Buka Console Browser (F12) untuk melihat nama-nama bagian mobilmu
+         console.log("Nama Bagian: ", child.name);
+ 
+         // Kenney biasanya menamai roda dengan kata "wheel"
+         if (child.name.toLowerCase().includes('wheel')) {
+           carWheels.push(child);
+         }
+       }
+     });
+ 
+     scene.add(playerCar);
+     console.log("Mobil Kenney berhasil dimuat!");
+   },
+   undefined,
+   (error) => {
+     console.error('Error loading car:', error);
+   }
+ );
+
+/* ======================================================
+   CAR CONTROLS & PHYSICS
+   Variable untuk mengatur pergerakan mobil
+====================================================== */
+
+// Status tombol keyboard
+const keys = {
+   w: false,
+   a: false,
+   s: false,
+   d: false
+ };
+ 
+ // Variabel Fisika Mobil
+ let speed = 0;
+ let maxSpeed = 0.10;       // Kecepatan maksimum
+ let acceleration = 0.002;  // Seberapa cepat mobil ngegas
+ let friction = 0.96;      // Seberapa cepat mobil berhenti (0-1)
+ let turnSpeed = 0.02;     // Kecepatan belok
+ 
+ // Event Listener untuk mendeteksi tombol ditekan
+ window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
+ 
+ // Event Listener untuk mendeteksi tombol dilepas
+ window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+
+ function updateCarMovement() {
+   if (!playerCar) return;
+ 
+   // --- 1. LOGIKA GAS & REM ---
+   if (keys.w) speed += acceleration;
+   if (keys.s) speed -= acceleration;
+ 
+   // Limit Kecepatan
+   if (speed > maxSpeed) speed = maxSpeed;
+   if (speed < -maxSpeed / 2) speed = -maxSpeed / 2;
+ 
+   // --- 2. LOGIKA GESEKAN (FRICTION) & BERHENTI TOTAL ---
+   if (!keys.w && !keys.s) {
+     speed *= friction;
+     
+     // FIX: Kita naikkan ambang batas berhenti agar mobil tidak "meluncur" terlalu lama
+     // Kalau speed sudah sangat kecil, langsung set 0 biar mobil diam total.
+     if (Math.abs(speed) < 0.005) { 
+       speed = 0;
+     }
+   }
+ 
+   // Pindahkan Mobil
+   playerCar.translateZ(speed);
+ 
+   // --- 3. LOGIKA BELOK (DIPERBAIKI) ---
+   // Kita hanya belok kalau speed tidak 0
+   if (speed !== 0) {
+     
+     /* FIX UTAMA: DYNAMIC TURN SPEED
+        Kita kalikan kecepatan putar dengan rasio kecepatan mobil.
+        Rumus: (Kecepatan Saat Ini / Kecepatan Maks)
+        
+        Efek:
+        - Saat ngebut -> Belok tajam (normal)
+        - Saat pelan -> Belok pelan
+        - Saat hampir berhenti -> Belok sangat sedikit (tidak muter di tempat)
+     */
+     const speedRatio = Math.abs(speed) / maxSpeed;
+     
+     // Clamp minimal ratio biar pas parkir (kecepatan rendah) setirnya ngga mati total
+     // Jadi minimal beloknya 10% dari kekuatan penuh
+     const dynamicTurnSpeed = turnSpeed * Math.max(speedRatio, 0.1);
+ 
+     if (keys.a) playerCar.rotation.y += dynamicTurnSpeed * (speed > 0 ? 1 : -1);
+     if (keys.d) playerCar.rotation.y -= dynamicTurnSpeed * (speed > 0 ? 1 : -1);
+   }
+ 
+   // --- 4. ANIMASI RODA ---
+   carWheels.forEach((wheel) => {
+     wheel.rotation.order = 'YXZ';
+     
+     // Animasi menggelinding (hanya jalan kalau speed != 0)
+     wheel.rotation.x += speed * 5; 
+ 
+     // Animasi Setir Belok Visual
+     if (wheel.name.toLowerCase().includes('front')) {
+        let targetSteer = 0;
+        
+        // Logika visual: Roda tetap belok walau mobil diam (seperti mobil asli)
+        // Tapi mobilnya tidak akan ikut muter karena ditahan logika di atas.
+        if (keys.a) targetSteer = 0.4;
+        if (keys.d) targetSteer = -0.4;
+        
+        wheel.rotation.y += (targetSteer - wheel.rotation.y) * 0.1;
+     }
+   });
+ }
+
+
 
 /* ======================================================
    CAMERA START POSITION
 ====================================================== */
-camera.position.set(0, 25, 30);
-controls.target.set(0, 0, 0);
-controls.update();
+// camera.position.set(0, 25, 30);
+// controls.target.set(0, 0, 0);
+// controls.update();
 
 /*MAU DIAPUS MAU NDAK BEBASSSS, BUAT NANDAIN OBJEKTIFNYA
 /*ANIMATION (PULSING OBJECTIVE SLOT)*/
 let pulse = 0;
 
+/* ======================================================
+   CAMERA FOLLOW LOGIC
+   ====================================================== */
+function updateCamera() {
+   if (!playerCar) return;
+
+   /* 1. Tentukan OFFSET (Jarak kamera dari mobil)
+      Vector3(X, Y, Z)
+      X: 0 (Tengah)
+      Y: 8 (Tinggi kamera dari tanah)
+      Z: -15 (Jarak di belakang mobil)
+      
+      TIPS: 
+      - Jika kamera malah ada di DEPAN mobil, ubah -15 jadi 15 (positif).
+      - Jika kamera terlalu dekat, besarkan angkanya (misal -20).
+   */
+   const relativeCameraOffset = new THREE.Vector3(0, 2, -4);
+
+   /* 2. Ubah Offset Lokal jadi Posisi World
+      Ini akan menghitung posisi kamera berdasarkan rotasi mobil saat ini.
+   */
+   const cameraOffset = relativeCameraOffset.applyMatrix4(playerCar.matrixWorld);
+
+   /* 3. Pindahkan Kamera secara Smooth (LERP)
+      0.1 = Kecepatan kamera mengejar mobil (0.01 lambat, 0.5 cepat, 1 instan)
+   */
+   camera.position.lerp(cameraOffset, 0.1);
+
+   /* 4. Kamera Selalu Menghadap Mobil
+   */
+   camera.lookAt(playerCar.position);
+}
+
+/* ======================================================
+   REAR CAMERA LOGIC (KACA SPION)
+   ====================================================== */
+   function updateRearCamera() {
+      if (!playerCar) return;
+    
+      /* UBAHAN POINT 1: AGAR MEMPERLIHATKAN MOBIL DARI DEPAN */
+      
+      /* 1. Posisi Kamera Spion Baru
+         Kita taruh di DEPAN mobil, sedikit di atas, agar bisa melihat kap mesin.
+         (Berdasarkan orientasi model ini, Z positif adalah arah depan)
+         X: 0 (Tengah), Y: 2.5 (Agak tinggi), Z: 6 (Di depan mobil)
+      */
+      const relativePos = new THREE.Vector3(0, 3, 0);
+      const cameraPos = relativePos.applyMatrix4(playerCar.matrixWorld);
+      rearCamera.position.copy(cameraPos);
+    
+      /* 2. Titik Fokus (Menghadap ke Belakang/Ke Arah Mobil)
+         Kita buat titik targetnya adalah bagian tengah mobil sedikit ke bawah.
+         Ini akan membuat kamera "menunduk" melihat kap mesin dan kaca depan.
+      */
+      const relativeLookAt = new THREE.Vector3(0, -3, -10); // Lihat ke tengah bodi mobil
+      const lookAtPos = relativeLookAt.applyMatrix4(playerCar.matrixWorld);
+      rearCamera.lookAt(lookAtPos);
+    }
+
 function animate() {
   requestAnimationFrame(animate);
+
+  updateCarMovement();
+  updateCamera();
+  updateRearCamera();
 
   if (targetSlot) {
     pulse += 0.05;
@@ -310,9 +559,52 @@ function animate() {
     targetSlot.scale.set(scale, 1, scale);
   }
 
-  controls.update();
+//   controls.update();
+//   renderer.render(scene, camera);
+
+/* --- RENDER LOGIC BARU (DUA KAMERA) --- */
+  
+  // 1. Bersihkan layar
+  renderer.setScissorTest(false);
+  renderer.clear();
+  renderer.setScissorTest(true);
+
+  // 2. RENDER VIEWPORT 1: MAIN CAMERA (FULL SCREEN)
+  // Menggunakan seluruh layar
+  renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+  renderer.setScissor(0, 0, window.innerWidth, window.innerHeight);
   renderer.render(scene, camera);
+
+  // 3. RENDER VIEWPORT 2: REAR CAMERA (KACA SPION)
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+
+  const mirrorW = width * 0.25; 
+  const mirrorH = height * 0.08; 
+  const x = (width / 2) - (mirrorW / 2);
+  const y = height - mirrorH - 10; 
+
+  // Update aspect ratio kamera spion
+  rearCamera.aspect = mirrorW / mirrorH;
+  
+  // Reset matriks proyeksi agar kalkulasi ulang bersih
+  rearCamera.updateProjectionMatrix();
+
+  /* --- TAMBAHAN: EFEK MIRROR --- */
+  // Kita "scale" sumbu X menjadi -1 pada matriks proyeksi.
+  // Ini akan membalik gambar secara horizontal (kanan jadi kiri).
+  rearCamera.projectionMatrix.scale(new THREE.Vector3(-1, 1, 1));
+
+  renderer.setViewport(x, y, mirrorW, mirrorH);
+  renderer.setScissor(x, y, mirrorW, mirrorH);
+
+  // Render scene dengan kamera yang sudah dibalik
+  renderer.render(scene, rearCamera);
+
+  renderer.setScissorTest(false);
 }
+
+
 
 animate();
 
