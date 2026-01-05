@@ -3,15 +3,47 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 
+// ===================================================
 // POPUP TUTORIAL CONTROL
+// ===================================================
 
-const tutorialPopup = document.getElementById('tutorialPopup');
-const closeTutorialBtn = document.getElementById('closeTutorial');
+// Flag untuk menandai apakah tutorial sudah ditutup
+// Selama bernilai false, sistem misi tidak akan berjalan
+let tutorialClosed = false;
 
-// Tutup popup saat tombol ditekan
-closeTutorialBtn.addEventListener('click', () => {
-  tutorialPopup.style.display = 'none';
+// Mengambil elemen popup tutorial dari HTML
+// tutorialPopup  : container popup tutorial
+// closeTutorialBtn : tombol "Mulai Bermain"
+const tutorialPopup = document.getElementById("tutorialPopup");
+const closeTutorialBtn = document.getElementById("closeTutorial");
+
+
+// Event ketika tombol "Mulai Bermain" diklik
+
+closeTutorialBtn.addEventListener("click", () => {
+
+  // Menutup popup tutorial. Popup disembunyikan terlebih dahulu agar tidak bertumpuk dengan alert misi
+  tutorialPopup.style.display = "none";
+  
+  // Menandai bahwa tutorial telah selesai
+  tutorialClosed = true;
+
+  // Menampilkan alert MISI 1 setelah popup tertutup
+  // Alert perintah MISI 1
+  setTimeout(showMission1Instruction, 200);
 });
+
+//  ALERT MISI 1 (DIPAKAI BERULANG)
+
+function showMission1Instruction() {
+  alert(
+    "🅿️ MISI 1\n\n" +
+    "Parkirkan mobil pada kotak yang berwarna HIJAU.\n\n" +
+    "Pastikan mobil berhenti di dalam kotak."
+  );
+  mission1InstructionShown = true;
+}
+
 
 const scene = new THREE.Scene();
 
@@ -584,42 +616,229 @@ function createTrail() {
   trails.push(trail);
 }
 
+// ===================================================
+// SISTEM MISI GAME PARKIR
+// ===================================================
 
-let parkingSuccess = false;
-// ================= CEK PARKIR BERHASIL =================
-// Fungsi ini bertugas mengecek apakah mobil sudah berhasil
-// masuk ke area target parkir yang berwarna hijau
-function checkParkingSuccess() {
+// Menyimpan misi yang sedang aktif
+// 1 = Misi parkir biasa
+// 2 = Misi parkir dengan batas waktu
+let currentMission = 1;
 
-  // Jika mobil belum ada, target belum ada,
-  // atau parkir sudah dinyatakan berhasil sebelumnya,
-  // maka fungsi dihentikan agar tidak dieksekusi terus
-  if (!playerCar || !targetSlot || parkingSuccess) return;
+// Waktu (detik) untuk misi parkir dengan timer
+let missionTime = 40;
 
-  // Menghitung jarak antara posisi mobil dengan
-  // titik tengah area target parkir (warna hijau)
-  // Semakin kecil nilainya, semakin dekat mobil ke target
+// Menentukan apakah mobil boleh digerakkan atau tidak
+// Digunakan saat transisi antar misi
+let carCanMove = true;
+
+// ---------------------------------------------------
+// FLAG UNTUK MENCEGAH ALERT MUNCUL BERULANG
+// ---------------------------------------------------
+
+// // Menandai apakah instruksi misi 1 sudah ditampilkan
+let mission1InstructionShown = false;
+
+// Menandai apakah instruksi misi 2 sudah ditampilkan
+let mission2InstructionShown = false;
+
+// Menandai apakah semua misi sudah selesai
+let allMissionsCompleted = false;
+
+
+// ===================================================
+// UI TIMER (UNTUK MISI 2)
+// ===================================================
+
+// Membuat elemen HTML untuk menampilkan timer
+const timerUI = document.createElement("div");
+
+timerUI.style.position = "absolute";
+timerUI.style.top = "20px";
+timerUI.style.right = "20px";
+timerUI.style.padding = "20px 28px";
+timerUI.style.background = "rgba(0,0,0,0.7)";
+timerUI.style.color = "#00ff00";
+timerUI.style.fontSize = "36px";;
+timerUI.style.borderRadius = "12px";
+
+// Timer disembunyikan di awal game
+timerUI.style.display = "none";
+
+// Menambahkan timer ke halaman
+document.body.appendChild(timerUI);
+
+
+//  RESET GAME SAAT PINDAH MISI
+
+
+function resetGameFromMission() {
+  // Pastikan mobil sudah ada
+  if (!playerCar) return;
+
+  // Mengunci pergerakan mobil sementara
+  // Agar mobil tidak langsung bergerak saat reset
+  carCanMove = false;
+
+  // Mengembalikan posisi mobil ke titik awal
+  playerCar.position.copy(spawnPoint);
+
+  // Mengatur arah mobil menghadap ke depan
+  playerCar.rotation.set(0, Math.PI, 0);
+
+  // Menghentikan kecepatan mobil
+  speed = 0;
+
+  // Membuka kembali pergerakan mobil setelah jeda
+  // Jeda untuk memberi waktu transisi antar misi
+  setTimeout(() => {
+    carCanMove = true;
+  }, 300);
+}
+
+
+//  MISI 
+
+function checkMissionSystem() {
+
+  // Jangan jalankan sistem misi sebelum tutorial selesai
+  if (!tutorialClosed) return;
+
+  // Pastikan mobil dan target parkir sudah tersedia
+  if (!playerCar || !targetSlot) return;
+
+  // Menghitung jarak mobil ke pusat kotak parkir
   const distance = playerCar.position.distanceTo(targetSlot.position);
 
-  // Mengecek apakah mobil sudah cukup dekat dengan area target parkir
-  // Angka 1.2 adalah toleransi jarak agar user tidak harus
-  const CloseEnough = distance < 1.2;
+  // Mengecek apakah mobil berada di dalam area target
+  const insideTarget = distance < 1.5;
 
-  // Mengecek apakah mobil dalam kondisi berhenti
-  // Jika nilai speed sangat kecil, maka mobil dianggap diam
-  const Stopped = Math.abs(speed) < 0.01;
+  // Mengecek apakah mobil sudah berhenti total
+  const carStopped = Math.abs(speed) < 0.01;
 
-  // Jika mobil cukup dekat dengan target dan mobil dalam keadaan berhenti maka parkir dinyatakan berhasil
-  if (CloseEnough && Stopped) {
+  // ================= MISI 1 =================
+  // Parkir dasar tanpa batas waktu
+  if (currentMission === 1) {
 
-    // Mengubah status parkir menjadi berhasil
-    // agar alert tidak muncul berulang-ulang
-    parkingSuccess = true;
+    // Jika mobil berada di target dan berhenti
+    if (insideTarget && carStopped) {
+      alert("✅ MISI 1 SELESAI");
 
-    // Menampilkan notifikasi bahwa parkir berhasil
-    alert('🎉 PARKING SUCCESS!');
+      // Pindah ke misi 2
+      currentMission = 2;
+
+      // Reset flag instruksi misi 2
+      mission2InstructionShown = false;
+
+      // Reset posisi mobil
+      resetGameFromMission();
+    }
+  }
+
+  // ================= MISI 2 =================
+  // Parkir dengan batas waktu
+  else if (currentMission === 2) {
+
+    // Menampilkan instruksi dan memulai timer (hanya sekali)
+    if (!mission2InstructionShown) {
+      alert(
+        "⏱️ MISI 2\n\n" +
+        "Parkirkan mobil ke kotak HIJAU\n" +
+        "sebelum waktu HABIS!"
+      );
+
+      mission2InstructionShown = true;
+
+      // Memulai timer misi
+      startMissionTimer();
+    }
+
+    // Jika mobil berhasil parkir sebelum waktu habis
+if (insideTarget && carStopped) {
+
+  // Hentikan timer misi 2
+  stopMissionTimer();
+
+  // ✅ ALERT KHUSUS MISI 2 SELESAI
+  alert(
+    "✅ MISI 2 SELESAI\n\n" +
+    "Kamu berhasil parkir tepat waktu!"
+  );
+
+  // 🎉 ALERT SEMUA MISI SELESAI (sekali saja)
+  alert(
+        "🎉 SELAMAT!\n\n" +
+        "Semua misi kamu sudah selesai 🎊"
+      );
+
+      currentMission = 1;
+      mission1InstructionShown = false;
+      mission2InstructionShown = false;
+      allMissionsCompleted = false;
+
+      resetGameFromMission();
+
+      setTimeout(showMission1Instruction, 200);
+    }
   }
 }
+
+
+
+// SISTEM TIMER MISI 2
+
+// Menyimpan interval timer
+let missionTimerInterval = null;
+
+// Fungsi untuk memulai timer misi 2
+function startMissionTimer() {
+
+  // Pastikan tidak ada timer ganda
+  stopMissionTimer();
+
+  // Reset waktu
+  missionTime = 20;
+
+  // Tampilkan timer
+  timerUI.innerText = "⏱️ 20";
+  timerUI.style.display = "block";
+
+  // Timer berjalan setiap 1 detik
+  missionTimerInterval = setInterval(() => {
+    missionTime--;
+    timerUI.innerText = `⏱️ ${missionTime}`;
+
+    // Jika waktu habis
+    if (missionTime <= 0) {
+
+      // Hentikan timer
+      stopMissionTimer();
+
+      alert("⏰ WAKTU HABIS!\nKembali ke MISI 1");
+
+      // Reset ke misi awal
+      currentMission = 1;
+      mission1InstructionShown = false;
+      mission2InstructionShown = false;
+      allMissionsCompleted = false;
+
+      resetGameFromMission();
+     setTimeout(showMission1Instruction, 200);
+    }
+  }, 1000);
+}
+
+// Fungsi untuk menghentikan timer
+function stopMissionTimer() {
+  if (missionTimerInterval) {
+    clearInterval(missionTimerInterval);
+    missionTimerInterval = null;
+  }
+
+  // Sembunyikan UI timer
+  timerUI.style.display = "none";
+}
+
 
 // Menambahkan POV Camera (First Person)
 let isPOV = false;
@@ -739,7 +958,8 @@ function updateCamera() {
 function animate() {
   requestAnimationFrame(animate);
   
-  checkParkingSuccess();
+  checkMissionSystem();
+
   updateCarMovement();
   updateCamera();
   updateRearCamera();
@@ -820,6 +1040,7 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
 
 
 
