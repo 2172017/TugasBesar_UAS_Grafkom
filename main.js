@@ -585,6 +585,47 @@ function createTrail() {
 }
 
 
+let parkingSuccess = false;
+// ================= CEK PARKIR BERHASIL =================
+// Fungsi ini bertugas mengecek apakah mobil sudah berhasil
+// masuk ke area target parkir yang berwarna hijau
+function checkParkingSuccess() {
+
+  // Jika mobil belum ada, target belum ada,
+  // atau parkir sudah dinyatakan berhasil sebelumnya,
+  // maka fungsi dihentikan agar tidak dieksekusi terus
+  if (!playerCar || !targetSlot || parkingSuccess) return;
+
+  // Menghitung jarak antara posisi mobil dengan
+  // titik tengah area target parkir (warna hijau)
+  // Semakin kecil nilainya, semakin dekat mobil ke target
+  const distance = playerCar.position.distanceTo(targetSlot.position);
+
+  // Mengecek apakah mobil sudah cukup dekat dengan area target parkir
+  // Angka 1.2 adalah toleransi jarak agar user tidak harus
+  const CloseEnough = distance < 1.2;
+
+  // Mengecek apakah mobil dalam kondisi berhenti
+  // Jika nilai speed sangat kecil, maka mobil dianggap diam
+  const Stopped = Math.abs(speed) < 0.01;
+
+  // Jika mobil cukup dekat dengan target
+  // DAN mobil dalam keadaan berhenti
+  // maka parkir dinyatakan berhasil
+  if (CloseEnough && Stopped) {
+
+    // Mengubah status parkir menjadi berhasil
+    // agar alert tidak muncul berulang-ulang
+    parkingSuccess = true;
+
+    // Menampilkan notifikasi bahwa parkir berhasil
+    alert('🎉 PARKING SUCCESS!');
+
+    // Menampilkan pesan tambahan di console
+    // berguna untuk debugging atau pengujian
+    console.log('Mobil berhasil diparkirkan di area target');
+  }
+}
 
 // Menambahkan POV Camera (First Person)
 let isPOV = false;
@@ -703,7 +744,8 @@ function updateCamera() {
 
 function animate() {
   requestAnimationFrame(animate);
-
+  
+  checkParkingSuccess();
   updateCarMovement();
   updateCamera();
   updateRearCamera();
@@ -784,4 +826,5 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
 
