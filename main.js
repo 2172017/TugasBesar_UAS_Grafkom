@@ -2,6 +2,17 @@ import * as THREE from 'three';
 // import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+
+// POPUP TUTORIAL CONTROL
+
+const tutorialPopup = document.getElementById('tutorialPopup');
+const closeTutorialBtn = document.getElementById('closeTutorial');
+
+// Tutup popup saat tombol ditekan
+closeTutorialBtn.addEventListener('click', () => {
+  tutorialPopup.style.display = 'none';
+});
+
 const scene = new THREE.Scene();
 
 /*JANGAN SENTUH!
@@ -773,3 +784,4 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
