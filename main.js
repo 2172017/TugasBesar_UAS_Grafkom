@@ -470,9 +470,142 @@ const keys = {
         wheel.rotation.y += (targetSteer - wheel.rotation.y) * 0.1;
      }
    });
+
+   // Menambahkan Trail atau Jejak Ban
+   if (Math.abs(speed) > 0.02) createTrail();
  }
 
 
+
+// Menambahkan Marker Objektif
+function createObjectiveMarker(position) {
+  const geometry = new THREE.CylinderGeometry(0.8, 0.8, 0.2, 32);
+
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      time: { value: 0 }
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float time;
+      varying vec2 vUv;
+
+      void main() {
+        float glow = sin(vUv.y * 10.0 + time) * 0.5 + 0.5;
+        gl_FragColor = vec4(0.1, 1.0, 0.3, glow);
+      }
+    `,
+    transparent: true
+  });
+
+  const marker = new THREE.Mesh(geometry, material);
+  marker.position.copy(position);
+  marker.position.y = 0.15;
+  scene.add(marker);
+
+  return marker;
+}
+
+
+
+// Menambahkan HP System
+let hp = 100;
+
+// Menambahkan Obstacle
+const obstacle = new THREE.Mesh(
+  new THREE.BoxGeometry(2, 2, 2),
+  new THREE.MeshStandardMaterial({ color: 0xff0000 })
+);
+obstacle.position.set(5, 1, 0);
+scene.add(obstacle);
+
+const obstacleBox = new THREE.Box3().setFromObject(obstacle);
+
+// Menambahkan Collision Check
+function checkCollision() {
+  if (!playerCar) return;
+
+  const carBox = new THREE.Box3().setFromObject(playerCar);
+
+  if (carBox.intersectsBox(obstacleBox)) {
+    hp -= 0.5;
+    console.log("HP:", hp);
+  }
+}
+
+
+
+// Menambahkan Spawn Point dan Respawn
+const spawnPoint = new THREE.Vector3(0, 0, 16);
+
+function respawnCar() {
+  playerCar.position.copy(spawnPoint);
+  playerCar.rotation.set(0, Math.PI, 0);
+  speed = 0;
+}
+if (hp <= 0) respawnCar();
+
+
+
+// Menambahkan Trail atau Jejak Ban
+const trails = [];
+
+function createTrail() {
+  const geo = new THREE.PlaneGeometry(0.3, 0.6);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0x000000,
+    transparent: true,
+    opacity: 0.3
+  });
+
+  const trail = new THREE.Mesh(geo, mat);
+  trail.rotation.x = -Math.PI / 2;
+  trail.position.copy(playerCar.position);
+  trail.position.y = 0.02;
+
+  scene.add(trail);
+  trails.push(trail);
+}
+
+
+
+// Menambahkan POV Camera (First Person)
+let isPOV = false;
+window.addEventListener('keydown', e => {
+  if (e.key === 'c') isPOV = !isPOV;
+});
+
+
+
+// Menambahkan Minimap
+const miniMapCamera = new THREE.OrthographicCamera(
+  -30, 30, 30, -30, 1, 100
+);
+miniMapCamera.position.set(0, 50, 0);
+miniMapCamera.lookAt(0, 0, 0);
+
+
+
+// Menambahkan Misi dan Level System
+let level = 1;
+let score = 0;
+
+function checkObjective() {
+  if (!targetSlot || !playerCar) return;
+
+  const dist = playerCar.position.distanceTo(targetSlot.position);
+  if (dist < 1.5 && Math.abs(speed) < 0.01) {
+    score += 100;
+    level++;
+    console.log("LEVEL UP:", level);
+  }
+}
 
 /* ======================================================
    CAMERA START POSITION
@@ -516,6 +649,19 @@ function updateCamera() {
    /* 4. Kamera Selalu Menghadap Mobil
    */
    camera.lookAt(playerCar.position);
+
+   // Menambahkan POV Camera (First Person)
+   if (isPOV) {
+  const pos = new THREE.Vector3(0, 1.2, 0.5)
+    .applyMatrix4(playerCar.matrixWorld);
+  camera.position.copy(pos);
+
+  const look = new THREE.Vector3(0, 1, 5)
+    .applyMatrix4(playerCar.matrixWorld);
+  camera.lookAt(look);
+  return;
+}
+
 }
 
 /* ======================================================
@@ -602,6 +748,17 @@ function animate() {
   renderer.render(scene, rearCamera);
 
   renderer.setScissorTest(false);
+
+  // Menambahkan Marker Objektif
+  marker.material.uniforms.time.value += 0.05;
+
+  // Menambahkan Collision Check
+  checkCollision();
+
+  // Menambahkan POV Camera (First Person)
+  renderer.setViewport(20, 20, 200, 200);
+  renderer.setScissor(20, 20, 200, 200);
+  renderer.render(scene, miniMapCamera);
 }
 
 
