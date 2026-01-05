@@ -3,11 +3,78 @@
   <head>
     <meta charset="utf-8">
     <title>My first three.js app</title>
-    <style>
-      body { margin: 0; }
+      /* STYLE POPUP TUTORIAL */
+      #tutorialPopup {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+  
+      .popup-content {
+         font-size: 20px;
+        background: #ffffff;
+        padding: 40px;
+        width: 520px;          
+        border-radius: 14px;
+        text-align: center;
+        font-family: Arial, sans-serif;
+    }
+  
+      .popup-content h2 {
+         font-size: 32px;      
+      }
+  
+      .popup-content ul {
+        text-align: left;
+        font-size: 18px;      
+        padding-left: 30px;
+        margin: 20px 0;
+      }
+  
+      .popup-content button {
+        margin-top: 15px;
+        padding: 10px 20px;
+        background: #2ecc71;
+        border: none;
+        border-radius: 6px;
+        color: white;
+        font-size: 20px;
+        cursor: pointer;
+      }
+  
+      .popup-content button:hover {
+        background: #27ae60;
+      }
     </style>
+
   </head>
   <body>
+    <!-- POPUP TUTORIAL PERMAINAN-->
+<div id="tutorialPopup">
+  <div class="popup-content">
+    <h2>Tutorial Bermain</h2>
+    <p>Selamat datang di simulasi parkir mobil</p>
+
+    <ul>
+      <li><b>W</b> : Maju</li>
+      <li><b>S</b> : Mundur</li>
+      <li><b>A</b> : Belok kiri</li>
+      <li><b>D</b> : Belok kanan</li>
+    </ul>
+
+    <p>Parkirkan mobil ke area target yang berwarna hijau terang</p>
+
+    <button id="closeTutorial">Mulai Bermain</button>
+  </div>
+</div>
+
     <script type="module" src="/main.js"></script>
   </body>
+
 </html>
