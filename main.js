@@ -609,9 +609,7 @@ function checkParkingSuccess() {
   // Jika nilai speed sangat kecil, maka mobil dianggap diam
   const Stopped = Math.abs(speed) < 0.01;
 
-  // Jika mobil cukup dekat dengan target
-  // DAN mobil dalam keadaan berhenti
-  // maka parkir dinyatakan berhasil
+  // Jika mobil cukup dekat dengan target dan mobil dalam keadaan berhenti maka parkir dinyatakan berhasil
   if (CloseEnough && Stopped) {
 
     // Mengubah status parkir menjadi berhasil
@@ -620,10 +618,6 @@ function checkParkingSuccess() {
 
     // Menampilkan notifikasi bahwa parkir berhasil
     alert('🎉 PARKING SUCCESS!');
-
-    // Menampilkan pesan tambahan di console
-    // berguna untuk debugging atau pengujian
-    console.log('Mobil berhasil diparkirkan di area target');
   }
 }
 
@@ -826,5 +820,6 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
 
 
