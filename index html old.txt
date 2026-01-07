@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+      <title>Simulasi Parkir Mobil</title>
+      <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<!-- ================= POPUP TUTORIAL ================= -->
+<div id="tutorialPopup">
+  <div class="popup-content">
+
+    <h2>Tutorial Bermain</h2>
+
+    <p>
+      Selamat datang di <b>Simulasi Parkir Mobil 3D</b>.<br>
+      Gunakan kontrol berikut untuk menggerakkan mobil:
+    </p>
+
+    <ul>
+      <li><span>Maju</span><b>W</b></li>
+      <li><span>Mundur</span><b>S</b></li>
+      <li><span>Belok Kiri</span><b>A</b></li>
+      <li><span>Belok Kanan</span><b>D</b></li>
+    </ul>
+
+    <p>
+      Parkirkan mobil ke <b>area hijau</b> dan pastikan mobil berhenti sempurna.
+    </p>
+
+    <button id="closeTutorial">Mulai Bermain</button>
+
+  </div>
+</div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+
+</html>
+

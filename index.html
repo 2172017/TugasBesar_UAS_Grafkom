@@ -1,122 +1,53 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
+<head>
     <meta charset="utf-8">
-      <title>Simulasi Parkir Mobil</title>
-    <style>
-    /* STYLE POPUP TUTORIAL */
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Simulasi Parkir Mobil 3D</title>
+    <link rel="stylesheet" href="style.css">
 
-    #tutorialPopup {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.65);
-      backdrop-filter: blur(6px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/examples/jsm/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
     }
-
-    /* ================= POPUP CARD ================= */
-    .popup-content {
-      width: 520px;
-      background: linear-gradient(145deg, #1f1f1f, #2b2b2b);
-      border-radius: 18px;
-      padding: 35px 40px;
-      color: #ffffff;
-      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6);
-      animation: popupScale 0.3s ease;
-    }
-
-  
-
-    .popup-content h2 {
-      margin-top: 0;
-      font-size: 32px;
-      color: #00ff88;
-      text-align: center;
-    }
-
-    .popup-content p {
-      font-size: 20px;
-      line-height: 1.6;
-      text-align: center;
-      margin: 15px 0;
-    }
-
-    .popup-content ul {
-      list-style: none;
-      padding: 0;
-      margin: 25px 0;
-    }
-
-    .popup-content li {
-      font-size: 20px;
-      padding: 10px 14px;
-      margin-bottom: 10px;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 10px;
-      display: flex;
-      justify-content: space-between;
-    }
-
-    .popup-content li b {
-      color: #00ff88;
-    }
-
-    /* ================= BUTTON ================= */
-    .popup-content button {
-      width: 100%;
-      padding: 14px;
-      margin-top: 20px;
-      font-size: 20px;
-      font-weight: bold;
-      border: none;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #2ecc71, #27ae60);
-      color: #ffffff;
-      cursor: pointer;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-      box-shadow: rgba(46, 204, 113, 0.4);
-    }
-
-    .popup-content button:hover {
-      box-shadow: 0 12px 28px rgba(46, 204, 113, 0.6);
-    }
-  </style>
+    </script>
 </head>
-
 <body>
 
-<!-- ================= POPUP TUTORIAL ================= -->
-<div id="tutorialPopup">
-  <div class="popup-content">
+  <button id="debugBtn" class="hud-btn">Hitbox: OFF</button>
+  <button id="fullscreenBtn" class="hud-btn">⛶ Full Screen</button>
 
-    <h2>Tutorial Bermain</h2>
+  <div id="tutorialPopup">
+    <div class="popup-content">
+        <h2>🅿️ Tutorial Parkir</h2>
+        <p>Selamat datang di <b>Simulasi Parkir Mobil 3D</b>.<br>Gunakan kontrol berikut:</p>
+        
+        <div class="keys-container">
+            <div class="key-row"><span>Maju</span> <kbd>W</kbd></div>
+            <div class="key-row"><span>Mundur</span> <kbd>S</kbd></div>
+            <div class="key-row"><span>Belok Kiri</span> <kbd>A</kbd></div>
+            <div class="key-row"><span>Belok Kanan</span> <kbd>D</kbd></div>
+            
+            <div style="height: 1px; background: rgba(255,255,255,0.1); margin: 8px 0;"></div>
 
-    <p>
-      Selamat datang di <b>Simulasi Parkir Mobil 3D</b>.<br>
-      Gunakan kontrol berikut untuk menggerakkan mobil:
-    </p>
+            <div class="key-row"><span>Ganti Kamera</span> <kbd>C</kbd></div>
+            <div class="key-row"><span>Tengok Kiri</span> <kbd style="min-width: 50px;">Shift</kbd></div>
+            <div class="key-row"><span>Tengok Kanan</span> <kbd style="min-width: 50px;">Ctrl</kbd></div>
+        </div>
 
-    <ul>
-      <li><span>Maju</span><b>W</b></li>
-      <li><span>Mundur</span><b>S</b></li>
-      <li><span>Belok Kiri</span><b>A</b></li>
-      <li><span>Belok Kanan</span><b>D</b></li>
-    </ul>
-
-    <p>
-      Parkirkan mobil ke <b>area hijau</b> dan pastikan mobil berhenti sempurna.
-    </p>
-
-    <button id="closeTutorial">Mulai Bermain</button>
-
+        <p style="font-size: 15px; color: #aaa; margin-top: 10px;">
+            Misi: Parkirkan mobil ke <b>area hijau</b> dan berhenti total.
+        </p>
+        
+        <button id="closeTutorial">Mulai Bermain</button>
+    </div>
   </div>
-</div>
 
-    <script type="module" src="/main.js"></script>
-  </body>
-
+  <script src="./js/ui.js"></script>
+  
+  <script type="module" src="./main.js"></script>
+</body>
 </html>
-
