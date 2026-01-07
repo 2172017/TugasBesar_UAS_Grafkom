@@ -1,0 +1,164 @@
+/* ================= RESET & LAYOUT UTAMA ================= */
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden; /* MENCEGAH SCROLLING */
+    background-color: #1a1a1a; /* Warna background aman sebelum canvas load */
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+  
+  canvas {
+    display: block; /* Menghilangkan margin bawah default canvas */
+    outline: none;
+  }
+  
+  /* ================= POPUP TUTORIAL ================= */
+  #tutorialPopup {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75); /* Sedikit lebih gelap agar fokus */
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    transition: opacity 0.3s ease;
+  }
+  
+  .popup-content {
+    width: 520px;
+    background: linear-gradient(145deg, #1f1f1f, #2b2b2b);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 18px;
+    padding: 35px 40px;
+    color: #ffffff;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6);
+    animation: popupScale 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Efek membal sedikit */
+  }
+  
+  @keyframes popupScale {
+    from { transform: scale(0.8); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  
+  .popup-content h2 {
+    margin-top: 0;
+    font-size: 32px;
+    color: #00ff88;
+    text-align: center;
+    text-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+  }
+  
+  .popup-content p {
+    font-size: 18px; /* Sedikit dikecilkan agar muat */
+    line-height: 1.6;
+    text-align: center;
+    margin: 15px 0;
+    color: #ddd;
+  }
+  
+  /* ================= KEYS CONTAINER ================= */
+  .keys-container {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  
+  .key-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  
+  .key-row:last-child {
+    border-bottom: none;
+  }
+  
+  .key-row span {
+    font-size: 16px;
+    color: #ccc;
+  }
+  
+  /* Styling Tombol Keyboard (KBD) */
+  kbd {
+    background: linear-gradient(to bottom, #eee, #ccc);
+    border: 1px solid #aaa;
+    border-radius: 6px;
+    box-shadow: 0 3px 0 #888, 0 4px 4px rgba(0,0,0,0.3);
+    color: #333;
+    display: inline-block;
+    font-family: 'Consolas', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 6px 12px;
+    min-width: 25px;
+    text-align: center;
+    text-shadow: 0 1px 0 #fff;
+    white-space: nowrap;
+  }
+  
+  /* ================= TOMBOL UTAMA (START) ================= */
+  #closeTutorial {
+    width: 100%;
+    padding: 14px;
+    margin-top: 10px;
+    font-size: 20px;
+    font-weight: bold;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #2ecc71, #27ae60);
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  
+  #closeTutorial:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(46, 204, 113, 0.5);
+    background: linear-gradient(135deg, #35d878, #2ecc71);
+  }
+  
+  #closeTutorial:active {
+    transform: translateY(1px);
+  }
+  
+  /* ================= HUD BUTTONS (Debug & Fullscreen) ================= */
+  .hud-btn {
+    position: absolute;
+    top: 10px;
+    z-index: 100; /* Di atas canvas tapi di bawah popup */
+    padding: 8px 15px;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: monospace;
+    font-weight: bold;
+    font-size: 14px;
+    transition: background 0.2s;
+    backdrop-filter: blur(4px);
+  }
+  
+  .hud-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: white;
+  }
+  
+  #debugBtn {
+    left: 10px;
+  }
+  
+  #fullscreenBtn {
+    right: 10px; /* Di pojok kanan atas */
+  }
