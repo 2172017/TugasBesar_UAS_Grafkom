@@ -41,8 +41,8 @@ export class Game {
         // =========================================
 
         // Setup Level Parkir
-        this.parking.createRow(8, 8, 0.5, -1); 
-        this.targetSlot = this.parking.createRow(-8, 8, 0.5, 3); 
+        this.parking.createRow(8, 20, 0.5, -1); 
+        this.targetSlot = this.parking.createRow(-8, 20, 0.5, 3); 
 
         // Init Mission
         this.mission = new MissionManager(this.car, this.targetSlot);
