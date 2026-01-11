@@ -1,50 +1,65 @@
+// ======================================================
+// IMPORT LIBRARY THREE.JS DAN MODULE TAMBAHAN
+// ======================================================
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OBB } from 'three/examples/jsm/math/OBB.js';
 
+// ======================================================
+// CLASS CAR
+// ======================================================
 export class Car {
+
+    // ==================================================
+    // CONSTRUCTOR
+    // ==================================================
     constructor(scene, camera, rearCamera, showDebug = false) {
+
+        // ---------- Referensi scene & kamera ----------
         this.scene = scene;
-        this.camera = camera;
-        this.rearCamera = rearCamera;
-        
+        this.camera = camera;           // Kamera utama
+        this.rearCamera = rearCamera;   // Kamera spion / rear view
+
+        // ---------- Model & komponen ----------
         this.model = null;
         this.wheels = [];
+
+        // ---------- Parameter fisika mobil ----------
         this.speed = 0;
         this.maxSpeed = 0.15;
         this.acceleration = 0.002;
         this.friction = 0.96;
         this.turnSpeed = 0.02;
 
+        // ---------- Input keyboard ----------
         this.keys = { w:false, a:false, s:false, d:false };
-        
-        // ==========================================
-        // 1. SETUP LOGIKA KAMERA BARU
-        // ==========================================
-        this.mainCameraMode = 0; // Mode utama (0=Normal, 1=Jauh, 2=FPS)
-        this.cameraMode = 0;     // Mode aktif saat ini (bisa 3/4 kalau shift/ctrl ditekan)
 
+        // ==================================================
+        // MODE KAMERA
+        // 0 = Belakang normal
+        // 1 = Belakang jauh
+        // 2 = First Person / Driver view
+        // 3 = Samping kiri (Shift)
+        // 4 = Samping kanan (Ctrl)
+        // ==================================================
+        this.mainCameraMode = 0;
+        this.cameraMode = 0;
+
+        // ---------- Event keyboard ----------
         window.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
 
-            // Tombol C: Ganti Mode Utama (Hanya 0, 1, 2)
-            if(key === 'c') {
-                this.mainCameraMode = (this.mainCameraMode + 1) % 3; 
-                this.cameraMode = this.mainCameraMode; // Update kamera aktif
-                console.log("Main Camera Mode:", this.mainCameraMode);
+            // Tombol C → ganti mode kamera utama
+            if (key === 'c') {
+                this.mainCameraMode = (this.mainCameraMode + 1) % 3;
+                this.cameraMode = this.mainCameraMode;
             }
 
-            // Tombol SHIFT: Tahan untuk lihat Kiri (Mode 3)
-            if (e.key === 'Shift') {
-                this.cameraMode = 3;
-            }
+            // Kamera samping (tahan tombol)
+            if (e.key === 'Shift') this.cameraMode = 3;
+            if (e.key === 'Control') this.cameraMode = 4;
 
-            // Tombol CONTROL: Tahan untuk lihat Kanan (Mode 4)
-            if (e.key === 'Control') {
-                this.cameraMode = 4;
-            }
-
-            // Simpan status tombol gerakan (wsad)
+            // Input gerakan mobil
             if (this.keys.hasOwnProperty(key)) {
                 this.keys[key] = true;
             }
@@ -53,7 +68,7 @@ export class Car {
         window.addEventListener('keyup', (e) => {
             const key = e.key.toLowerCase();
 
-            // Jika Shift atau Control dilepas, KEMBALI ke mode utama
+            // Lepas tombol samping → kembali ke kamera utama
             if (e.key === 'Shift' || e.key === 'Control') {
                 this.cameraMode = this.mainCameraMode;
             }
@@ -63,231 +78,329 @@ export class Car {
             }
         });
 
-        // OBB Setup
-        this.obb = new OBB(); 
-        
-        // Debug Hitbox
+        // ==================================================
+        // HITBOX (OBB)
+        // ==================================================
+        this.obb = new OBB();
+
+        // ---------- Debug hitbox ----------
         this.showDebug = showDebug;
         const debugGeo = new THREE.BoxGeometry(1, 1, 1);
-        const debugMat = new THREE.MeshBasicMaterial({ color: 0xffff00, wireframe: true });
+        const debugMat = new THREE.MeshBasicMaterial({
+            color: 0xffff00,
+            wireframe: true
+        });
         this.debugMesh = new THREE.Mesh(debugGeo, debugMat);
-        this.debugMesh.visible = false; 
-        if (this.showDebug) this.debugMesh.visible = true;
+        this.debugMesh.visible = showDebug;
         this.scene.add(this.debugMesh);
-        
-        // Smoke Setup
+
+        // ==================================================
+        // SISTEM AUDIO
+        // ==================================================
+        this.listener = new THREE.AudioListener();
+        this.camera.add(this.listener);
+
+        this.engineIdle = new THREE.Audio(this.listener); // suara idle
+        this.engineRun  = new THREE.Audio(this.listener); // suara jalan
+        this.crashSound = new THREE.Audio(this.listener); // suara tabrakan
+
+        this.audioLoader = new THREE.AudioLoader();
+        this.isCrashed = false; // mencegah crash sound berulang
+
+        this.loadAudio();
+
+        // ==================================================
+        // SISTEM ASAP / SMOKE
+        // ==================================================
         this.smokeParticles = [];
         this.smokeEmissionCounter = 0;
         this.setupSmokeSystem();
 
+        // Load model mobil
         this.loadModel();
     }
 
+    // ==================================================
+    // LOAD AUDIO FILE
+    // ==================================================
+    loadAudio() {
+
+        // Suara mesin idle
+        this.audioLoader.load('./assets/sounds/engine_idle.mp3', buffer => {
+            this.engineIdle.setBuffer(buffer);
+            this.engineIdle.setLoop(true);
+            this.engineIdle.setVolume(0.4);
+        });
+
+        // Suara mesin berjalan
+        this.audioLoader.load('./assets/sounds/engine_run.mp3', buffer => {
+            this.engineRun.setBuffer(buffer);
+            this.engineRun.setLoop(true);
+            this.engineRun.setVolume(1.0);
+        });
+
+        // Suara tabrakan
+        this.audioLoader.load('./assets/sounds/crash.mp3', buffer => {
+            this.crashSound.setBuffer(buffer);
+            this.crashSound.setLoop(false);
+            this.crashSound.setVolume(1.0);
+        });
+    }
+
+    // ==================================================
+    // SETUP ASAP / SMOKE
+    // ==================================================
     setupSmokeSystem() {
-        const textureLoader = new THREE.TextureLoader();
-        this.smokeTexture = textureLoader.load('./assets/img/gray_smoke.png'); 
+        const texLoader = new THREE.TextureLoader();
+        this.smokeTexture = texLoader.load('./assets/img/gray_smoke.png');
 
         this.smokeGeometry = new THREE.PlaneGeometry(1, 1);
         this.smokeMaterial = new THREE.MeshBasicMaterial({
             map: this.smokeTexture,
             transparent: true,
-            opacity: 0.4, 
-            depthWrite: false, 
+            opacity: 0.4,
+            depthWrite: false,
             side: THREE.DoubleSide
         });
     }
 
+    // ==================================================
+    // LOAD MODEL MOBIL
+    // ==================================================
     loadModel() {
         const loader = new GLTFLoader();
         loader.load('./assets/car_model/GLB format/sedan-sports.glb', (gltf) => {
+
             this.model = gltf.scene;
-            this.model.rotation.y = Math.PI; 
+            this.model.rotation.y = Math.PI;
             this.model.position.set(0, 0, 16);
             this.model.scale.set(1.3, 1.3, 1.3);
 
+            // Cari roda & aktifkan shadow
             this.model.traverse(c => {
-                if(c.isMesh) {
-                    c.castShadow = true; c.receiveShadow = true;
-                    if(c.material) c.material.side = THREE.DoubleSide;
-                    if(c.name.toLowerCase().includes('wheel')) this.wheels.push(c);
+                if (c.isMesh) {
+                    c.castShadow = true;
+                    c.receiveShadow = true;
+                    if (c.material) c.material.side = THREE.DoubleSide;
+                    if (c.name.toLowerCase().includes('wheel')) {
+                        this.wheels.push(c);
+                    }
                 }
             });
+
+            // Tempelkan audio ke mobil (3D sound)
+            this.model.add(this.engineIdle);
+            this.model.add(this.engineRun);
+            this.model.add(this.crashSound);
+
+            // Mulai suara idle
+            if (!this.engineIdle.isPlaying) this.engineIdle.play();
+
             this.scene.add(this.model);
 
+            // Hitung ukuran OBB
             const box = new THREE.Box3().setFromObject(this.model);
             const size = new THREE.Vector3();
             box.getSize(size);
             this.obb.halfSize.copy(size).multiplyScalar(0.5);
             this.debugMesh.scale.copy(size);
-
-            console.log("Mobil Loaded");
         });
     }
 
-    setDebug(isVisible) {
-        if (this.debugMesh) {
-            this.debugMesh.visible = isVisible;
-        }
-    }
-
-    update(obstacleOBB) { 
+    // ==================================================
+    // UPDATE LOOP (dipanggil tiap frame)
+    // ==================================================
+    update(obstacleOBB) {
         if (!this.model) return;
-        this.updatePhysics(obstacleOBB); 
-        this.updateSmoke();
-        this.updateCameras();
+        this.updatePhysics(obstacleOBB);   // fisika & collision
+        this.updateSmoke();                // asap
+        this.updateEngineSound();          // audio mesin
+        this.updateCameras();              // kamera
     }
 
-    updateSmoke() {
-        if (this.speed > 0.01) {
-            this.smokeEmissionCounter++;
-            if (this.smokeEmissionCounter % 5 === 0) {
-                const particle = new THREE.Mesh(this.smokeGeometry, this.smokeMaterial.clone());
-                const offset = new THREE.Vector3(0, 0.5, -2.5).applyMatrix4(this.model.matrixWorld);
-                particle.position.copy(offset);
-                particle.rotation.z = Math.random() * Math.PI;
-                particle.scale.set(0.5, 0.5, 0.5);
-                particle.userData = { life: 1.0, driftX: (Math.random() - 0.5) * 0.02 };
-                this.scene.add(particle);
-                this.smokeParticles.push(particle);
-            }
+    // ==================================================
+    // LOGIKA SUARA MESIN
+    // ==================================================
+    updateEngineSound() {
+        const s = Math.abs(this.speed);
+
+        // Mobil diam → idle
+        if (s < 0.01) {
+            if (!this.engineIdle.isPlaying) this.engineIdle.play();
+            if (this.engineRun.isPlaying) this.engineRun.pause();
         }
+        // Mobil bergerak
+        else {
+            if (!this.engineRun.isPlaying) this.engineRun.play();
+            if (this.engineIdle.isPlaying) this.engineIdle.pause();
 
-        this.smokeParticles.forEach((p, index) => {
-            p.position.y += 0.03; 
-            p.translateZ(-0.02); 
-            p.position.x += p.userData.driftX;
-            p.scale.multiplyScalar(1.03);
-            p.userData.life -= 0.015; 
-            p.material.opacity = p.userData.life * 0.4; 
-            p.lookAt(this.camera.position);
-
-            if (p.userData.life <= 0) {
-                this.scene.remove(p);
-                p.material.dispose();
-                p.geometry.dispose();
-                this.smokeParticles.splice(index, 1); 
-            }
-        });
+            const ratio = s / this.maxSpeed;
+            this.engineRun.setVolume(THREE.MathUtils.clamp(ratio, 0.3, 1));
+            this.engineRun.setPlaybackRate(
+                THREE.MathUtils.lerp(0.8, 1.4, ratio)
+            );
+        }
     }
 
+    // ==================================================
+    // FISIKA, GERAKAN & COLLISION
+    // ==================================================
     updatePhysics(obstacleOBB) {
-        const oldPosition = this.model.position.clone();
-        const oldRotation = this.model.rotation.y;
 
+        const oldPos = this.model.position.clone();
+        const oldRot = this.model.rotation.y;
+
+        // Akselerasi
         if (this.keys.w) this.speed += this.acceleration;
         if (this.keys.s) this.speed -= this.acceleration;
-        
-        if (this.speed > this.maxSpeed) this.speed = this.maxSpeed;
-        if (this.speed < -this.maxSpeed/2) this.speed = -this.maxSpeed/2;
-        
+
+        // Batas kecepatan
+        this.speed = THREE.MathUtils.clamp(
+            this.speed,
+            -this.maxSpeed / 2,
+            this.maxSpeed
+        );
+
+        // Gesekan saat tidak gas/rem
         if (!this.keys.w && !this.keys.s) {
             this.speed *= this.friction;
             if (Math.abs(this.speed) < 0.001) this.speed = 0;
         }
 
+        // Gerakkan mobil
         this.model.translateZ(this.speed);
 
+        // Belok
         if (this.speed !== 0) {
-            const ratio = Math.abs(this.speed) / this.maxSpeed;
-            const turn = this.turnSpeed * Math.max(ratio, 0.1);
-            if (this.keys.a) this.model.rotation.y += turn * (this.speed > 0 ? 1 : -1);
-            if (this.keys.d) this.model.rotation.y -= turn * (this.speed > 0 ? 1 : -1);
+            const t = this.turnSpeed * Math.max(Math.abs(this.speed) / this.maxSpeed, 0.1);
+            if (this.keys.a) this.model.rotation.y += t * (this.speed > 0 ? 1 : -1);
+            if (this.keys.d) this.model.rotation.y -= t * (this.speed > 0 ? 1 : -1);
         }
 
-        this.wheels.forEach(w => {
-            w.rotation.x += this.speed * 5;
-            if(w.name.includes('front')) {
-                let steer = 0;
-                if(this.keys.a) steer = 0.4;
-                if(this.keys.d) steer = -0.4;
-                w.rotation.y += (steer - w.rotation.y) * 0.1;
-            }
-        });
+        // Rotasi roda
+        this.wheels.forEach(w => w.rotation.x += this.speed * 5);
 
-        // OBB & Debug Update
+        // Update OBB
         this.obb.center.copy(this.model.position);
-        this.obb.center.y += 1; 
+        this.obb.center.y += 1;
+        this.obb.rotation.setFromMatrix4(
+            new THREE.Matrix4().makeRotationY(this.model.rotation.y)
+        );
 
-        // Fix rotation matrix error
-        const rotationMatrix = new THREE.Matrix4();
-        rotationMatrix.makeRotationY(this.model.rotation.y);
-        this.obb.rotation.setFromMatrix4(rotationMatrix);
-
+        // Update debug hitbox
         this.debugMesh.position.copy(this.obb.center);
         this.debugMesh.rotation.y = this.model.rotation.y;
 
-        if (obstacleOBB) {
-            if (this.obb.intersectsOBB(obstacleOBB)) {
-                this.model.position.copy(oldPosition);
-                this.model.rotation.y = oldRotation;
-                this.speed = -this.speed * 0.5;
+        // Collision detection
+        if (obstacleOBB && this.obb.intersectsOBB(obstacleOBB)) {
 
-                this.obb.center.copy(this.model.position);
-                this.obb.center.y += 1;
-                
-                const undoRotMatrix = new THREE.Matrix4();
-                undoRotMatrix.makeRotationY(this.model.rotation.y);
-                this.obb.rotation.setFromMatrix4(undoRotMatrix);
-                
-                this.debugMesh.position.copy(this.obb.center);
-                this.debugMesh.rotation.y = this.model.rotation.y;
+            // Mainkan suara crash sekali
+            if (!this.isCrashed) {
+                this.crashSound.stop();
+                this.crashSound.play();
+                this.isCrashed = true;
             }
+
+            // Batalkan pergerakan
+            this.model.position.copy(oldPos);
+            this.model.rotation.y = oldRot;
+            this.speed = -this.speed * 0.5;
+
+        } else {
+            this.isCrashed = false;
         }
     }
 
-    // ==========================================
-    // 2. POSISI KAMERA YANG DIPERBARUI
-    // ==========================================
+    // ==================================================
+    // UPDATE ASAP / SMOKE
+    // ==================================================
+    updateSmoke() {
+        if (this.speed > 0.01 && ++this.smokeEmissionCounter % 5 === 0) {
+            const p = new THREE.Mesh(
+                this.smokeGeometry,
+                this.smokeMaterial.clone()
+            );
+            p.position.copy(
+                new THREE.Vector3(0, 0.5, -2.5)
+                    .applyMatrix4(this.model.matrixWorld)
+            );
+            p.userData = { life: 1 };
+            this.scene.add(p);
+            this.smokeParticles.push(p);
+        }
+
+        // Update partikel asap
+        this.smokeParticles.forEach((p, i) => {
+            p.position.y += 0.03;
+            p.userData.life -= 0.02;
+            p.material.opacity = p.userData.life * 0.4;
+            p.lookAt(this.camera.position);
+
+            if (p.userData.life <= 0) {
+                this.scene.remove(p);
+                this.smokeParticles.splice(i, 1);
+            }
+        });
+    }
+
+    // ==================================================
+    // UPDATE KAMERA (UTAMA & REAR VIEW)
+    // ==================================================
     updateCameras() {
         let relativeOffset = new THREE.Vector3();
         let lookAtTarget = new THREE.Vector3();
-        
-        // Kita gunakan 'this.cameraMode' yang bisa berubah jadi 3 atau 4 saat tombol ditekan
+
+        // Kamera utama
         switch (this.cameraMode) {
-            case 0: // Normal (Belakang)
+
+            case 0: // Belakang normal
                 relativeOffset.set(0, 2.5, -5);
                 lookAtTarget.copy(this.model.position);
                 break;
 
-            case 1: // Jauh (Belakang Long)
-                relativeOffset.set(0, 5, -10); 
+            case 1: // Belakang jauh
+                relativeOffset.set(0, 5, -10);
                 lookAtTarget.copy(this.model.position);
                 break;
 
-            case 2: // First Person (Driver)
-                relativeOffset.set(0, 1.1, 0.3); 
-                lookAtTarget = new THREE.Vector3(0, 1, 20).applyMatrix4(this.model.matrixWorld);
+            case 2: // First Person / Driver view
+                relativeOffset.set(0, 1.1, 0.3);
+                lookAtTarget = new THREE.Vector3(0, 1, 20)
+                    .applyMatrix4(this.model.matrixWorld);
                 break;
 
-            case 3: // SHIFT: Sisi Kiri (Melihat dari kiri ke body mobil)
-                // Posisi: Kiri (x negatif), agak tinggi, sejajar body
-                relativeOffset.set(-6, 2, 0); 
+            case 3: // Samping kiri
+                relativeOffset.set(-6, 2, 0);
                 lookAtTarget.copy(this.model.position);
                 break;
 
-            case 4: // CONTROL: Sisi Kanan (Melihat dari kanan ke body mobil)
-                // Posisi: Kanan (x positif), agak tinggi
+            case 4: // Samping kanan
                 relativeOffset.set(6, 2, 0);
                 lookAtTarget.copy(this.model.position);
                 break;
         }
 
+        // Hitung posisi kamera utama
         const cameraPos = relativeOffset.applyMatrix4(this.model.matrixWorld);
 
-        // Jika mode FPS (2) atau Side View (3 & 4), gerakan instan agar responsif
+        // Smooth hanya untuk mode belakang
         if (this.cameraMode >= 2) {
             this.camera.position.copy(cameraPos);
         } else {
-            // Mode normal pakai lerp biar smooth
             this.camera.position.lerp(cameraPos, 0.1);
         }
 
         this.camera.lookAt(lookAtTarget);
 
-        // Kamera Spion
-        const rearPos = new THREE.Vector3(0, 2.2, 1.5).applyMatrix4(this.model.matrixWorld);
+        // ------------------------------
+        // KAMERA REAR VIEW (SPION)
+        // ------------------------------
+        const rearPos = new THREE.Vector3(0, 2.2, 1.5)
+            .applyMatrix4(this.model.matrixWorld);
         this.rearCamera.position.copy(rearPos);
-        const rearLook = new THREE.Vector3(0, 1, -20).applyMatrix4(this.model.matrixWorld);
+
+        const rearLook = new THREE.Vector3(0, 1, -20)
+            .applyMatrix4(this.model.matrixWorld);
         this.rearCamera.lookAt(rearLook);
     }
 }
