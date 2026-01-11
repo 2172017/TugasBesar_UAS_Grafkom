@@ -1,7 +1,13 @@
+// ======================================================
+// IMPORT LIBRARY THREE.JS DAN MODULE TAMBAHAN
+// ======================================================
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OBB } from 'three/examples/jsm/math/OBB.js';
 
+// ======================================================
+// CLASS CAR
+// ======================================================
 export class Car {
     // 1. TERIMA loadingManager di parameter terakhir
     constructor(scene, camera, rearCamera, x = 0, z = 0, rotationY = 0, audioManager, loadingManager) {
@@ -71,12 +77,45 @@ export class Car {
     setupPhysics() {
         this.obb = new OBB(); 
         const debugGeo = new THREE.BoxGeometry(1, 1, 1);
-        const debugMat = new THREE.MeshBasicMaterial({ color: 0xffff00, wireframe: true });
+        const debugMat = new THREE.MeshBasicMaterial({
+            color: 0xffff00,
+            wireframe: true
+        });
         this.debugMesh = new THREE.Mesh(debugGeo, debugMat);
         this.debugMesh.visible = false; 
         this.scene.add(this.debugMesh);
     }
 
+    // ==================================================
+    // LOAD AUDIO FILE
+    // ==================================================
+    loadAudio() {
+
+        // Suara mesin idle
+        this.audioLoader.load('./assets/sounds/engine_idle.mp3', buffer => {
+            this.engineIdle.setBuffer(buffer);
+            this.engineIdle.setLoop(true);
+            this.engineIdle.setVolume(0.4);
+        });
+
+        // Suara mesin berjalan
+        this.audioLoader.load('./assets/sounds/engine_run.mp3', buffer => {
+            this.engineRun.setBuffer(buffer);
+            this.engineRun.setLoop(true);
+            this.engineRun.setVolume(1.0);
+        });
+
+        // Suara tabrakan
+        this.audioLoader.load('./assets/sounds/crash.mp3', buffer => {
+            this.crashSound.setBuffer(buffer);
+            this.crashSound.setLoop(false);
+            this.crashSound.setVolume(1.0);
+        });
+    }
+
+    // ==================================================
+    // SETUP ASAP / SMOKE
+    // ==================================================
     setupSmokeSystem() {
         // 3. GUNAKAN loadingManager di TextureLoader
         const textureLoader = new THREE.TextureLoader(this.loadingManager);
@@ -91,6 +130,9 @@ export class Car {
         this.smokeEmissionCounter = 0;
     }
 
+    // ==================================================
+    // LOAD MODEL MOBIL
+    // ==================================================
     loadModel() {
         // 4. GUNAKAN loadingManager di GLTFLoader
         const loader = new GLTFLoader(this.loadingManager);
@@ -132,6 +174,7 @@ export class Car {
             this.setupRearLights();
             this.scene.add(this.model);
 
+            // Hitung ukuran OBB
             const box = new THREE.Box3().setFromObject(this.model);
             const size = new THREE.Vector3();
             box.getSize(size);
@@ -289,6 +332,33 @@ export class Car {
                     }
                 }
             }
+
+            // Batalkan pergerakan
+            this.model.position.copy(oldPos);
+            this.model.rotation.y = oldRot;
+            this.speed = -this.speed * 0.5;
+
+        } else {
+            this.isCrashed = false;
+        }
+    }
+
+    // ==================================================
+    // UPDATE ASAP / SMOKE
+    // ==================================================
+    updateSmoke() {
+        if (this.speed > 0.01 && ++this.smokeEmissionCounter % 5 === 0) {
+            const p = new THREE.Mesh(
+                this.smokeGeometry,
+                this.smokeMaterial.clone()
+            );
+            p.position.copy(
+                new THREE.Vector3(0, 0.5, -2.5)
+                    .applyMatrix4(this.model.matrixWorld)
+            );
+            p.userData = { life: 1 };
+            this.scene.add(p);
+            this.smokeParticles.push(p);
         }
 
         if (!isCollided && borders && Array.isArray(borders)) {
@@ -341,7 +411,9 @@ export class Car {
         
         const rearPos = new THREE.Vector3(0, 2.2, 1.5).applyMatrix4(this.model.matrixWorld);
         this.rearCamera.position.copy(rearPos);
-        const rearLook = new THREE.Vector3(0, 1, -20).applyMatrix4(this.model.matrixWorld);
+
+        const rearLook = new THREE.Vector3(0, 1, -20)
+            .applyMatrix4(this.model.matrixWorld);
         this.rearCamera.lookAt(rearLook);
     }
 
