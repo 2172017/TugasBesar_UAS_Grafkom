@@ -9,13 +9,12 @@ export class Game {
     constructor() {
         this.scene = new THREE.Scene();
         
-        // 1. SETUP LOADING MANAGER (BARU)
-        // ==============================
+        // 1. SETUP LOADING MANAGER
         this.loadingManager = new THREE.LoadingManager();
-        this.setupLoadingUI(); // Fungsi untuk mengatur update tampilan HTML
+        this.setupLoadingUI(); 
 
         // =========================================
-        // SETUP CAMERA & RENDERER (Sama seperti sebelumnya)
+        // SETUP CAMERA & RENDERER
         // =========================================
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 20000);
         this.rearCamera = new THREE.PerspectiveCamera(60, 2.5, 0.1, 20000);
@@ -30,15 +29,12 @@ export class Game {
         document.body.appendChild(this.renderer.domElement);
 
         // =========================================
-        // INIT COMPONENTS (Kirim loadingManager ke sini)
+        // INIT COMPONENTS
         // =========================================
 
-        // Kirim manager ke Audio
-        // Pastikan constructor AudioManager menerima parameter kedua (manager)
         this.audioManager = new AudioManager(this.camera, this.loadingManager);
         this.audioManager.loadAll();
 
-        // Kirim manager ke Environment (untuk TextureLoader/GLTFLoader di sana)
         this.env = new Environment(this.scene, this.loadingManager);
 
         this.parking = new ParkingSystem(this.scene, this.loadingManager);
@@ -49,7 +45,6 @@ export class Game {
         const startZ = 45; 
         const startRot = Math.PI; 
 
-        // Kirim manager ke Car (jika Car memuat model 3D sendiri)
         this.car = new Car(this.scene, this.camera, this.rearCamera, startX, startZ, startRot, this.audioManager, this.loadingManager);
 
         this.mission = new MissionManager(this.car, this.parking, this.audioManager, this.loadingManager);
@@ -65,8 +60,6 @@ export class Game {
                 tutPopup.style.opacity = '0';
                 setTimeout(() => {
                     tutPopup.style.display = 'none';
-                    // Opsional: Bunyikan suara klik UI di sini jika ada
-                    // this.audioManager.playClick(); 
                 }, 300);
             });
         }
@@ -76,18 +69,16 @@ export class Game {
     }
 
     // =========================================
-    // LOGIKA LOADING SCREEN
+    // LOGIKA LOADING SCREEN (+ CREDITS)
     // =========================================
     setupLoadingUI() {
         const loadingScreen = document.getElementById('loading-screen');
         const loadingText = document.querySelector('.loading-text');
-        const loader = document.querySelector('.loader'); // <--- 1. Ambil elemen spinner
+        const loader = document.querySelector('.loader'); 
         const tutorialPopup = document.getElementById('tutorialPopup');
         
-        // Sembunyikan tutorial di awal
         if(tutorialPopup) tutorialPopup.style.display = 'none';
 
-        // SAAT LOADING BERJALAN
         this.loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
             const progress = Math.round((itemsLoaded / itemsTotal) * 100);
             if(loadingText) loadingText.innerText = `MEMUAT... ${progress}%`;
@@ -97,15 +88,12 @@ export class Game {
         this.loadingManager.onLoad = () => {
             console.log('Loading Complete!');
             
-            // 2. HILANGKAN SPINNER (Loader)
             if (loader) {
                 loader.style.display = 'none'; 
             }
 
-            // 3. UBAH TEKS JADI TOMBOL/INSTRUKSI
             if(loadingText) {
                 loadingText.innerText = "▶ KLIK LAYAR UNTUK MULAI";
-                // Styling agar terlihat seperti tombol/ajakan
                 loadingText.style.fontWeight = "bold";
                 loadingText.style.fontSize = "24px";
                 loadingText.style.color = "#00ff88"; 
@@ -116,7 +104,6 @@ export class Game {
                 loadingText.style.cursor = "pointer";
                 loadingText.style.transition = "all 0.3s";
                 
-                // Efek hover sederhana lewat JS (opsional)
                 loadingText.onmouseover = () => {
                     loadingText.style.background = "rgba(0, 255, 136, 0.3)";
                     loadingText.style.transform = "scale(1.05)";
@@ -127,24 +114,49 @@ export class Game {
                 };
             }
 
-            // Ubah cursor layar loading jadi pointer
-            if(loadingScreen) loadingScreen.style.cursor = "pointer";
+            // --- TAMBAHKAN CREDITS DI SINI ---
+            const creditsDiv = document.createElement('div');
+            creditsDiv.style.cssText = `
+                margin-top: 40px; 
+                font-family: monospace; 
+                font-size: 11px; 
+                color: #888; 
+                text-align: center; 
+                line-height: 1.8;
+                z-index: 10002;
+            `;
+            
+            creditsDiv.innerHTML = `
+                <div>Car Model from <a href="https://kenney.nl/assets/car-kit" target="_blank" style="color: #bbb; text-decoration: none; border-bottom: 1px dotted #bbb;">Kenney.nl</a></div>
+                <div>Fence from <a href="https://poly.pizza/m/gLbBiYwt7l" target="_blank" style="color: #bbb; text-decoration: none; border-bottom: 1px dotted #bbb;">Poly.pizza</a></div>
+                <div>Asphalt Texture from <a href="https://ambientcg.com/" target="_blank" style="color: #bbb; text-decoration: none; border-bottom: 1px dotted #bbb;">AmbientCG.com</a></div>
+            `;
 
-            // FUNGSI SAAT DIKLIK
+            // Mencegah klik pada link memicu "Start Game"
+            const links = creditsDiv.querySelectorAll('a');
+            links.forEach(link => {
+                link.addEventListener('click', (e) => e.stopPropagation());
+                link.onmouseover = () => link.style.color = "#fff";
+                link.onmouseout = () => link.style.color = "#bbb";
+            });
+
+            if(loadingScreen) {
+                loadingScreen.style.cursor = "pointer";
+                loadingScreen.appendChild(creditsDiv); // Masukkan credits ke layar
+            }
+            // ----------------------------------
+
             const onStartClick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
 
-                // Start Audio & System
                 this.audioManager.startSystem();
 
-                // Hilangkan Loading Screen
                 if(loadingScreen) {
                     loadingScreen.style.opacity = '0';
                     setTimeout(() => {
                         loadingScreen.style.display = 'none';
                         
-                        // Tampilkan Tutorial setelah loading hilang
                         if(tutorialPopup) {
                             tutorialPopup.style.display = 'flex';
                             tutorialPopup.style.opacity = '0';
@@ -157,7 +169,6 @@ export class Game {
                 }
             };
 
-            // Pasang Listener Klik
             if (loadingScreen) {
                 loadingScreen.addEventListener('click', onStartClick, { once: true });
             }
@@ -182,7 +193,6 @@ export class Game {
                 this.car.setDebug(isDebugOn);
                 this.env.setDebug(isDebugOn);
 
-                // Dispatch Event agar main.js tahu (sesuai diskusi sebelumnya)
                 const event = new CustomEvent('toggleDebug', { detail: { debug: isDebugOn } });
                 window.dispatchEvent(event);
             });
