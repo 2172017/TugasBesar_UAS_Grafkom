@@ -1,89 +1,62 @@
 import * as THREE from 'three';
+import { ParkingSlot } from './ParkingSlot.js';
 
 export class ParkingSystem {
     constructor(scene) {
         this.scene = scene;
-        
-        // KONFIGURASI UKURAN
         this.slotWidth = 3.5;  
         this.slotDepth = 6.5;  
-        this.lineWidth = 0.15; 
         
-        // Material Garis (Putih)
-        this.lineMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0xffffff 
-        });
+        this.slots = []; // Menyimpan semua object ParkingSlot
 
-        // Material Target (Hijau Transparan)
-        this.targetMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00ff00,
-            transparent: true,
-            opacity: 0.4, 
-            side: THREE.DoubleSide,
-            depthWrite: false
+        // Material Shared
+        this.lineMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        this.hologramMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00ff00, transparent: true, opacity: 0.15,
+            side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
+        });
+        this.wireframeMaterial = new THREE.LineBasicMaterial({
+            color: 0x00ff00, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending
         });
     }
 
-    createSlot(x, z, isTarget) {
-        const slotGroup = new THREE.Group();
-        slotGroup.position.set(x, 0.05, z); 
-
-        // A. GARIS KIRI
-        const leftGeo = new THREE.PlaneGeometry(this.lineWidth, this.slotDepth);
-        const left = new THREE.Mesh(leftGeo, this.lineMaterial);
-        left.rotation.x = -Math.PI / 2;
-        left.position.set(-this.slotWidth / 2, 0, 0);
-        slotGroup.add(left);
-
-        // B. GARIS KANAN
-        const right = left.clone();
-        right.position.set(this.slotWidth / 2, 0, 0);
-        slotGroup.add(right);
-
-        // C. GARIS BELAKANG
-        const backGeo = new THREE.PlaneGeometry(this.slotWidth, this.lineWidth);
-        const back = new THREE.Mesh(backGeo, this.lineMaterial);
-        back.rotation.x = -Math.PI / 2;
-        back.position.set(0, 0, -this.slotDepth / 2); 
-        slotGroup.add(back);
-
-        // D. LOGIKA TARGET (SENSOR HIJAU)
-        let sensorMesh = null;
+    generateParkingArea() {
+        const totalLines = 4;        
+        const slotsPerLine = 10;     
+        const roadGap = 8;           
         
-        if (isTarget) {
-            const fillGeo = new THREE.PlaneGeometry(this.slotWidth - 0.2, this.slotDepth - 0.2);
-            const fill = new THREE.Mesh(fillGeo, this.targetMaterial);
-            fill.rotation.x = -Math.PI / 2;
-            fill.name = "TargetSensor"; 
-            slotGroup.add(fill);
-            
-            sensorMesh = fill; 
+        const singleLineDepth = (this.slotDepth * 2); 
+        const totalBlockDepth = (singleLineDepth * totalLines) + (roadGap * (totalLines - 1));
+        
+        let currentZ = -(totalBlockDepth / 2) + (this.slotDepth / 2);
+
+        for (let line = 0; line < totalLines; line++) {
+            this.createRow(currentZ, slotsPerLine, 0, Math.PI);
+            this.createRow(currentZ + this.slotDepth, slotsPerLine, 0, 0);
+            currentZ += (this.slotDepth * 2) + roadGap;
         }
-
-        this.scene.add(slotGroup);
-        return isTarget ? sensorMesh : null;
     }
 
-    createRow(zPosition, count, gap, startIndex) {
-        let targetSlotMesh = null;
-
+    createRow(zPosition, count, gap, rotationY) {
         for (let i = 0; i < count; i++) {
-            const x = (i * (this.slotWidth + gap)) - ((count * (this.slotWidth + gap)) / 2) + (this.slotWidth/2);
+            const totalRowWidth = count * (this.slotWidth + gap);
+            const x = (i * (this.slotWidth + gap)) - (totalRowWidth / 2) + (this.slotWidth / 2);
 
-            // ====================================================
-            // PERBAIKAN DI SINI:
-            // Hapus Math.abs(). Biarkan murni membandingkan angka.
-            // Jika startIndex = -1, maka (i === -1) akan selalu false.
-            // ====================================================
-            const isTarget = (i === startIndex);
-
-            const slotResult = this.createSlot(x, zPosition, isTarget);
-
-            if (slotResult) {
-                targetSlotMesh = slotResult;
-            }
+            const slot = new ParkingSlot(
+                this.scene, x, zPosition, 
+                this.slotWidth, this.slotDepth, rotationY, 
+                this.lineMaterial
+            );
+            this.slots.push(slot);
         }
+    }
 
-        return targetSlotMesh; 
+    // Fungsi helper untuk MissionManager
+    getSlot(index) {
+        return this.slots[index];
+    }
+
+    getAllSlots() {
+        return this.slots;
     }
 }

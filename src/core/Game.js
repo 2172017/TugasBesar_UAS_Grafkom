@@ -3,14 +3,15 @@ import { Environment } from '../world/Environment.js';
 import { ParkingSystem } from '../objects/ParkingSystem.js';
 import { Car } from '../objects/Car.js';
 import { MissionManager } from '../managers/MissionManager.js';
-// 1. IMPORT CLASS OBSTACLE BARU
 import { Obstacle } from '../objects/Obstacle.js'; 
 
 export class Game {
     constructor() {
         this.scene = new THREE.Scene();
         
-        // Main Camera
+        // =========================================
+        // SETUP CAMERA
+        // =========================================
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 20000);
         
         // Rear Camera (Spion)
@@ -27,25 +28,31 @@ export class Game {
         this.renderer.setScissorTest(true);
         document.body.appendChild(this.renderer.domElement);
 
-        // Init Components
-        this.env = new Environment(this.scene);
-        this.parking = new ParkingSystem(this.scene);
-
-        // Masukkan flag debug ke mobil
-        this.car = new Car(this.scene, this.camera, this.rearCamera);
-
-        // Buat Obstacle manual (bukan dari environment)
-        // Posisi X=5, Z=0
-        this.obstacleObject = new Obstacle(this.scene, 5, 0);
-
+        // =========================================
+        // INIT COMPONENTS & WORLD
         // =========================================
 
-        // Setup Level Parkir
-        this.parking.createRow(8, 8, 0.5, -1); 
-        this.targetSlot = this.parking.createRow(-8, 8, 0.5, 3); 
+        // Environment
+        this.env = new Environment(this.scene);
+
+        //Parking System
+        this.parking = new ParkingSystem(this.scene);
+        this.parking.generateParkingArea();
+
+        // --- UPDATE SPAWN POINT ---
+        // Posisi di pojok kanan "depan" (dekat Z=50)
+        const startX = 20; 
+        const startZ = 45; 
+        
+        // ROTASI DIPERBAIKI:
+        // Gunakan Math.PI (180 derajat) agar berputar menghadap ke dalam area parkir (arah negatif Z)
+        const startRot = Math.PI; 
+
+        this.car = new Car(this.scene, this.camera, this.rearCamera, startX, startZ, startRot);
 
         // Init Mission
-        this.mission = new MissionManager(this.car, this.targetSlot);
+        this.mission = new MissionManager(this.car, this.parking);
+        this.mission.startMission(1);
 
         this.setupDebugButton();
 
@@ -66,8 +73,10 @@ export class Game {
                 btn.style.color = isDebugOn ? "#00ff00" : "white";
                 btn.style.borderColor = isDebugOn ? "#00ff00" : "white";
 
-                // Aktifkan visualisasi di Mobil & Obstacle
+                // Aktifkan visualisasi di Mobil & Environment
                 this.car.setDebug(isDebugOn);
+                this.env.setDebug(isDebugOn);
+
                 if (this.obstacleObject) {
                     this.obstacleObject.setDebug(isDebugOn);
                 }
@@ -85,18 +94,30 @@ export class Game {
         requestAnimationFrame(() => this.animate());
 
         // =========================================
-        // 3. UPDATE LOGIC DENGAN OBSTACLE BARU
+        // 1. UPDATE LOGIC
         // =========================================
-        // Kita ambil collider dari this.obstacleObject, BUKAN this.env
-        if (this.obstacleObject && this.obstacleObject.obb) {
-            this.car.update(this.obstacleObject.obb);
-        } else {
-            this.car.update();
+        const currentObstacles = this.mission.getObstacles();
+        const currentBorders = this.env.getBorders();
+
+        if (this.car) {
+            this.car.update(currentObstacles, currentBorders);
         }
         
-        this.mission.check();
+        if (this.mission) {
+            this.mission.check();
+        }
 
-        // 1. BERSIHKAN LAYAR
+        // Update Posisi Minimap agar mengikuti mobil
+        if (this.car.model) {
+            this.miniMapCamera.position.x = this.car.model.position.x;
+            this.miniMapCamera.position.z = this.car.model.position.z;
+            this.miniMapCamera.lookAt(this.car.model.position.x, 0, this.car.model.position.z);
+        }
+
+        // =========================================
+        // 2. RENDERING PIPELINE
+        // =========================================
+
         this.renderer.setScissorTest(false);
         this.renderer.clear(); 
         this.renderer.setScissorTest(true);
@@ -104,12 +125,12 @@ export class Game {
         const w = window.innerWidth;
         const h = window.innerHeight;
 
-        // 2. RENDER MAIN CAMERA
+        // RENDER MAIN CAMERA
         this.renderer.setViewport(0, 0, w, h);
         this.renderer.setScissor(0, 0, w, h);
         this.renderer.render(this.scene, this.camera);
 
-        // 3. RENDER SPION
+        // RENDER SPION (REAR MIRROR)
         const mw = w * 0.25;      
         const mh = h * 0.15;      
         const mx = (w/2) - (mw/2); 
@@ -123,7 +144,7 @@ export class Game {
         this.renderer.setScissor(mx, my, mw, mh);
         this.renderer.render(this.scene, this.rearCamera);
 
-        // 4. RENDER MINIMAP
+        // RENDER MINIMAP
         this.renderer.setViewport(20, 20, 200, 200);
         this.renderer.setScissor(20, 20, 200, 200);
         this.renderer.render(this.scene, this.miniMapCamera);

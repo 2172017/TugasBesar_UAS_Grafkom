@@ -155,7 +155,7 @@ body, html {
     border-color: white;
   }
   
-  #debugBtn {
+  #debugBtn, #respawnBtn {
     left: 10px;
   }
   

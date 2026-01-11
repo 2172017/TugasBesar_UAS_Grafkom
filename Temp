@@ -1,0 +1,6 @@
+Car line 152
+// POSISI BARU (LEBIH MENEMPEL)
+        const zPos = -1.25;  // Lebih maju ke depan (menempel bodi)
+        const yPos = 0.33;   // Sedikit turun
+        const xOuter = 0.45; // Geser dikit ke dalam
+        const xInner = 0.30; // Geser dikit ke luar
