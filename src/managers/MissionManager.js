@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 
 export class MissionManager {
-    constructor(car, parkingSystem) {
+    constructor(car, parkingSystem, audioManager, loadingManager) {
         this.car = car;
         this.parkingSystem = parkingSystem;
-        
+        this.audioManager = audioManager;
+        this.loadingManager = loadingManager;
+
         this.activeSlot = null;
         this.activeObstacles = []; 
         
@@ -14,12 +16,9 @@ export class MissionManager {
         this.missionTime = 20;
         this.timerInterval = null;
 
-        // --- UPDATE SPAWN POINT ---
-        // Sesuai dengan posisi di Game.js (Entrance Corner)
         this.spawnPoint = new THREE.Vector3(20, 0, 45); 
-        this.spawnRotation = Math.PI; // Menghadap ke dalam
+        this.spawnRotation = Math.PI; 
 
-        // State Parkir (3 Detik)
         this.parkingStartTime = null; 
         this.requiredParkingTime = 3000; 
 
@@ -27,29 +26,104 @@ export class MissionManager {
     }
 
     setupUI() {
+        // 1. BUAT ELEMEN CUSTOM POPUP
+        // Z-Index diubah ke 5000 (agar di bawah Loading Screen yang biasanya 10000)
+        this.msgPopup = document.createElement('div');
+        this.msgPopup.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); display: none;
+            justify-content: center; align-items: center; z-index: 5000;
+            backdrop-filter: blur(5px);
+        `;
+        
+        this.msgPopup.innerHTML = `
+            <div style="
+                background: linear-gradient(145deg, #1a1a1a, #2a2a2a); 
+                padding: 30px; 
+                border: 2px solid #00ff88; 
+                border-radius: 15px; 
+                text-align: center; 
+                max-width: 400px; 
+                width: 80%;
+                color: white; 
+                font-family: 'Segoe UI', sans-serif;
+                box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
+            ">
+                <h2 id="msgTitle" style="margin-top: 0; color: #00ff88; font-size: 28px; text-transform: uppercase;">INFO</h2>
+                <p id="msgBody" style="font-size: 18px; line-height: 1.6; color: #ddd; margin: 20px 0;">Message</p>
+                <button id="msgBtn" style="
+                    padding: 12px 30px; 
+                    background: #00ff88; 
+                    color: #000; 
+                    border: none; 
+                    font-weight: bold; 
+                    cursor: pointer; 
+                    font-size: 16px; 
+                    border-radius: 8px;
+                    transition: transform 0.1s;
+                ">SIAP!</button>
+            </div>
+        `;
+        document.body.appendChild(this.msgPopup);
+
+        this.msgBtn = this.msgPopup.querySelector('#msgBtn');
+        this.msgTitle = this.msgPopup.querySelector('#msgTitle');
+        this.msgBody = this.msgPopup.querySelector('#msgBody');
+
+        this.msgBtn.onmouseover = () => this.msgBtn.style.transform = "scale(1.05)";
+        this.msgBtn.onmouseout = () => this.msgBtn.style.transform = "scale(1)";
+
+        // 2. SETUP CLOSE TUTORIAL
         const closeBtn = document.getElementById("closeTutorial");
         if(closeBtn) {
             closeBtn.addEventListener("click", () => {
-                document.getElementById("tutorialPopup").style.display = "none";
-                this.tutorialClosed = true;
+                const tutorialPopup = document.getElementById("tutorialPopup");
+                if(tutorialPopup) tutorialPopup.style.display = "none";
+                
+                this.tutorialClosed = true; // Tandai tutorial sudah ditutup
+                
+                // --- FIX ERROR AUDIO ---
+                // Cek apakah function playBGM benar-benar ada sebelum dipanggil
+                if (this.audioManager && typeof this.audioManager.playBGM === 'function') {
+                    this.audioManager.playBGM();
+                } else {
+                    console.warn("AudioManager: playBGM method not found. Check audio.js");
+                }
+                
+                // PANGGIL ULANG MISI 1 (Popup akan muncul karena tutorialClosed = true)
                 setTimeout(() => this.showInstruction(1), 200);
             });
         }
 
-        // --- TOMBOL RESPAWN ---
         const respawnBtn = document.getElementById("respawnBtn");
         if(respawnBtn) {
             respawnBtn.addEventListener("click", () => {
-                // Jika tombol ditekan, panggil fungsi resetCar
                 this.resetCar();
-                
-                // Opsional: Hilangkan fokus dari tombol agar saat tekan 'Space' (rem) tidak memicu tombol lagi
                 respawnBtn.blur(); 
             });
         }
 
+        const soundBtn = document.getElementById("soundBtn");
+        if (soundBtn && this.audioManager) {
+            soundBtn.addEventListener("click", () => {
+                const isMuted = this.audioManager.toggleMute();
+                if (isMuted) {
+                    soundBtn.innerText = "🔇 Sound: OFF";
+                    soundBtn.style.color = "#ff4444"; 
+                    soundBtn.style.borderColor = "#ff4444";
+                } else {
+                    soundBtn.innerText = "🔊 Sound: ON";
+                    soundBtn.style.color = "white"; 
+                    soundBtn.style.borderColor = "white";
+                }
+                soundBtn.blur(); 
+            });
+        }
+
+        // --- PERBAIKAN POSISI TIMER ---
         this.timerUI = document.createElement("div");
-        this.timerUI.style.cssText = "position:absolute; top:20px; right:20px; padding:20px 28px; background:rgba(0,0,0,0.7); color:#00ff00; font-size:36px; border-radius:12px; display:none; font-family: monospace; font-weight: bold;";
+        // top diubah menjadi 150px (cukup jauh di bawah tombol kanan atas)
+        this.timerUI.style.cssText = "position:absolute; top:150px; right:20px; padding:20px 28px; background:rgba(0,0,0,0.7); color:#00ff00; font-size:36px; border-radius:12px; display:none; font-family: monospace; font-weight: bold; z-index: 100;";
         document.body.appendChild(this.timerUI);
 
         this.parkingUI = document.createElement("div");
@@ -62,27 +136,55 @@ export class MissionManager {
         document.body.appendChild(this.parkingUI);
     }
 
+    showPopup(title, message, callback) {
+        this.msgTitle.innerText = title;
+        this.msgBody.innerHTML = message.replace(/\n/g, '<br>');
+        this.msgPopup.style.display = 'flex';
+
+        this.msgBtn.onclick = () => {
+            this.msgPopup.style.display = 'none';
+            if (callback) callback(); 
+        };
+    }
+
     startMission(level) {
+        // --- LOGIC POPUP ---
+        // Jika Tutorial BELUM ditutup (awal game saat loading), jangan lakukan apa-apa.
+        // Popup hanya boleh muncul setelah user menutup Tutorial HTML.
+        if (!this.tutorialClosed) return;
+
         this.missionLevel = level;
         this.parkingStartTime = null; 
         this.parkingUI.style.display = "none";
 
         let targetIndex = 0;
         let density = 0; 
-
+        
         if (level === 1) {
             targetIndex = 5; 
             density = 0.4;   
-            alert("🅿️ MISI 1\n\nParkirkan mobil MUNDUR (Menghadap Keluar).\nTahan posisi selama 3 detik.");
+            
+            this.showPopup(
+                "🅿️ MISI 1", 
+                "Parkirkan mobil MUNDUR (Menghadap Keluar).\nTahan posisi selama 3 detik.", 
+                () => {
+                    this.setupLevel(targetIndex, density);
+                }
+            );
         } 
         else if (level === 2) {
             targetIndex = 55; 
             density = 0.7;    
-            alert("⏱️ MISI 2\n\nParkirkan di lokasi BARU dalam batas waktu!");
-            this.startTimer();
+            
+            this.showPopup(
+                "⏱️ MISI 2", 
+                "Parkirkan di lokasi BARU dalam batas waktu!", 
+                () => {
+                    this.setupLevel(targetIndex, density);
+                    this.startTimer(); 
+                }
+            );
         }
-
-        this.setupLevel(targetIndex, density);
     }
 
     setupLevel(targetIndex, density) {
@@ -113,7 +215,9 @@ export class MissionManager {
     showInstruction(level) { this.startMission(level); }
 
     check() {
+        // Pastikan tidak mengecek saat popup info sedang tampil
         if (!this.tutorialClosed || !this.car.model || !this.activeSlot) return;
+        if (this.msgPopup.style.display === 'flex') return;
 
         const targetPos = this.activeSlot.getWorldPosition();
         const carPos = this.car.model.position;
@@ -171,14 +275,16 @@ export class MissionManager {
 
     completeMission() {
         if (this.missionLevel === 1) {
-            alert("✅ MISI 1 SELESAI\nParkir Sempurna!");
-            this.resetCar();
-            setTimeout(() => this.showInstruction(2), 500);
+            this.showPopup("✅ SELESAI", "Parkir Sempurna! Lanjut ke Level 2.", () => {
+                this.resetCar();
+                setTimeout(() => this.showInstruction(2), 200);
+            });
         } else if (this.missionLevel === 2) {
             this.stopTimer();
-            alert("🎉 SELAMAT! SEMUA MISI SELESAI!");
-            this.resetCar();
-            setTimeout(() => this.showInstruction(1), 500);
+            this.showPopup("🎉 TAMAT!", "SELAMAT! SEMUA MISI SELESAI!", () => {
+                this.resetCar();
+                setTimeout(() => this.showInstruction(1), 200);
+            });
         }
     }
 
@@ -192,11 +298,13 @@ export class MissionManager {
             this.timerUI.innerText = "⏱️ " + this.missionTime;
             if (this.missionTime <= 0) {
                 this.stopTimer();
-                alert("⏰ WAKTU HABIS! Ulangi Misi.");
-                this.resetCar();
-                this.parkingStartTime = null; 
-                this.parkingUI.style.display = "none";
-                setTimeout(() => this.showInstruction(this.missionLevel), 500);
+                
+                this.showPopup("⏰ WAKTU HABIS!", "Jangan menyerah, coba lagi!", () => {
+                    this.resetCar();
+                    this.parkingStartTime = null; 
+                    this.parkingUI.style.display = "none";
+                    setTimeout(() => this.showInstruction(this.missionLevel), 200);
+                });
             }
         }, 1000);
     }
@@ -206,15 +314,12 @@ export class MissionManager {
     resetCar() {
         if (!this.car.model) return;
         
-        // GUNAKAN SPAWN POINT YANG SUDAH DIUPDATE
         this.car.model.position.copy(this.spawnPoint);
         this.car.model.rotation.set(0, this.spawnRotation, 0); 
         
-        // Reset Physics
         this.car.speed = 0;
         this.car.currentSteering = 0; 
         
-        // Reset UI Parking
         this.parkingStartTime = null;
         this.parkingUI.style.display = "none";
     }

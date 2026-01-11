@@ -4,9 +4,13 @@ import { OBB } from 'three/examples/jsm/math/OBB.js';
 import { Fence } from '../objects/Fence.js';
 
 export class Environment {
-    constructor(scene) {
+    // 1. Terima loadingManager di sini
+    constructor(scene, loadingManager) {
         this.scene = scene;
-        this.loader = new GLTFLoader();
+        this.loadingManager = loadingManager; // Simpan referensi (opsional, tapi good practice)
+        
+        // 2. Gunakan loadingManager pada GLTFLoader
+        this.loader = new GLTFLoader(this.loadingManager);
         
         // VARIABEL ENVIRONMENT (Area Parkir Utama)
         this.worldWidth = 50;  
@@ -69,7 +73,9 @@ export class Environment {
 
     setupSkybox() {
         this.scene.fog = new THREE.Fog(0xcccccc, 20, 120);
-        const loader = new THREE.TextureLoader();
+        
+        // 3. Gunakan loadingManager pada TextureLoader Skybox
+        const loader = new THREE.TextureLoader(this.loadingManager);
         loader.setPath('./assets/textures/skybox/');
 
         const materials = [
@@ -109,10 +115,11 @@ export class Environment {
 
     setupGround() {
         // --- SOLUSI 2: GROUND "INFINITE" ---
-        // Kita buat ukuran ground jauh lebih besar dari worldWidth/Depth
         const groundSize = 2000; 
 
-        const loader = new THREE.TextureLoader();
+        // 4. Gunakan loadingManager pada TextureLoader Ground
+        const loader = new THREE.TextureLoader(this.loadingManager);
+        
         const path = './assets/textures/asphalt/';
         const loadTex = (f) => loader.load(path + f);
         const colorMap = loadTex('Asphalt025C_1K-JPG_Color.jpg');
@@ -121,10 +128,6 @@ export class Environment {
         if(colorMap) { 
             colorMap.wrapS = colorMap.wrapT = THREE.RepeatWrapping; 
             
-            // Hitung repeat agar tekstur tidak melar saat diperbesar
-            // Misal: aslinya skala 4x8 untuk area 50x100.
-            // Maka rasionya adalah texture per ~12.5 unit.
-            // 2000 / 12.5 = 160.
             const repeatVal = groundSize / 12.5; 
             colorMap.repeat.set(repeatVal, repeatVal); 
         }
@@ -142,57 +145,43 @@ export class Environment {
 
     async setupFences() {
         try {
+            // Loader ini (this.loader) sudah menggunakan loadingManager dari constructor
             const gltf = await this.loader.loadAsync('./assets/fence/fence.glb');
             const model = gltf.scene;
             const box = new THREE.Box3().setFromObject(model);
             
-            // Anggap lebar model pagar ada di sumbu X
             const fenceLength = box.max.x - box.min.x; 
             
             const halfW = this.worldWidth/2; 
             const halfD = this.worldDepth/2;
             
-            // --- SOLUSI 1: MENGATASI OVERLAP SUDUT ---
-            
-            // A. Pagar Depan & Belakang (Sumbu X) - FULL WIDTH
-            // Pagar ini akan menutupi sampai ujung kiri dan kanan.
+            // A. Pagar Depan & Belakang (Sumbu X)
             const countX = Math.ceil(this.worldWidth / fenceLength);
-            
-            // Geser sedikit startPos agar benar-benar centered jika hasil bagi tidak bulat
-            // Atau mulai dari -halfW
             const startPosX = -halfW;
             
             for (let i = 0; i < countX; i++) {
-                // Tambahkan fenceLength/2 karena pivot object biasanya di tengah
                 const x = startPosX + (i * fenceLength) + (fenceLength/2);
-                
-                // Pastikan pagar tidak "lewat" jauh dari batas worldWidth (opsional, untuk kerapian)
                 if (x > halfW + fenceLength) break;
 
-                new Fence(this.scene, model, x, 0, halfD, Math.PI); // Depan (+Z)
-                new Fence(this.scene, model, x, 0, -halfD, 0);       // Belakang (-Z)
+                new Fence(this.scene, model, x, 0, halfD, Math.PI); 
+                new Fence(this.scene, model, x, 0, -halfD, 0);       
             }
 
-            // B. Pagar Kiri & Kanan (Sumbu Z) - INSIDE (Dimasukkan ke dalam)
-            // Pagar ini dimulai SETELAH pagar depan, dan berhenti SEBELUM pagar belakang.
-            // Kita kurangi panjang total loop sebesar 2x panjang pagar (atas & bawah)
-            
-            const innerDepth = this.worldDepth - (fenceLength * 1.8); // 1.8 untuk memberi sedikit toleransi overlap agar rapat
+            // B. Pagar Kiri & Kanan (Sumbu Z)
+            const innerDepth = this.worldDepth - (fenceLength * 1.8); 
             const countZ = Math.ceil(innerDepth / fenceLength);
             
-            // Start position dimulai agak menjorok ke dalam (bukan dari -halfD)
-            // Start dari: -halfD + (panjang pagar satu blok)
-            const startPosZ = -halfD + (fenceLength * 0.9); // 0.9 agar overlap sedikit supaya tidak bolong
+            const startPosZ = -halfD + (fenceLength * 0.9); 
 
             for (let i = 0; i < countZ; i++) {
                 const z = startPosZ + (i * fenceLength) + (fenceLength/2);
 
-                new Fence(this.scene, model, -halfW, 0, z, Math.PI / 2);  // Kiri
-                new Fence(this.scene, model, halfW, 0, z, -Math.PI / 2);  // Kanan
+                new Fence(this.scene, model, -halfW, 0, z, Math.PI / 2);  
+                new Fence(this.scene, model, halfW, 0, z, -Math.PI / 2);  
             }
 
         } catch (error) {
-            console.error(error);
+            console.error("Error loading fence:", error);
         }
     }    
 }

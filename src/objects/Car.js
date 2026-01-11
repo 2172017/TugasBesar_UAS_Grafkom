@@ -3,13 +3,17 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OBB } from 'three/examples/jsm/math/OBB.js';
 
 export class Car {
-    // 1. Tambahkan parameter x, z, dan rotationY di constructor
-    constructor(scene, camera, rearCamera, x = 0, z = 0, rotationY = 0) {
+    // 1. TERIMA loadingManager di parameter terakhir
+    constructor(scene, camera, rearCamera, x = 0, z = 0, rotationY = 0, audioManager, loadingManager) {
         this.scene = scene;
         this.camera = camera;
         this.rearCamera = rearCamera;
+        this.audioManager = audioManager;
         
-        // Simpan posisi spawn untuk inisialisasi model
+        // 2. Simpan Loading Manager
+        this.loadingManager = loadingManager;
+
+        // Simpan posisi spawn
         this.spawnX = x;
         this.spawnZ = z;
         this.spawnRotation = rotationY;
@@ -38,11 +42,10 @@ export class Car {
 
         this.setupInput();
         this.setupPhysics();
-        this.setupSmokeSystem();
-        this.loadModel();
+        this.setupSmokeSystem(); // <-- Di dalam sini kita pakai loadingManager
+        this.loadModel();        // <-- Di dalam sini kita pakai loadingManager
     }
 
-    // ... (setupInput, setupPhysics, setupSmokeSystem TETAP SAMA) ...
     setupInput() {
         this.mainCameraMode = 0; 
         this.cameraMode = 0;     
@@ -75,7 +78,9 @@ export class Car {
     }
 
     setupSmokeSystem() {
-        const textureLoader = new THREE.TextureLoader();
+        // 3. GUNAKAN loadingManager di TextureLoader
+        const textureLoader = new THREE.TextureLoader(this.loadingManager);
+        
         this.smokeTexture = textureLoader.load('./assets/img/gray_smoke.png'); 
         this.smokeGeometry = new THREE.PlaneGeometry(1, 1);
         this.smokeMaterial = new THREE.MeshBasicMaterial({
@@ -87,17 +92,14 @@ export class Car {
     }
 
     loadModel() {
-        const loader = new GLTFLoader();
+        // 4. GUNAKAN loadingManager di GLTFLoader
+        const loader = new GLTFLoader(this.loadingManager);
+        
         loader.load('./assets/car_model/glb/sedan-sports.glb', (gltf) => {
             this.model = gltf.scene;
             
-            // 2. Terapkan Posisi Spawn dari Constructor
             this.model.position.set(this.spawnX, 0, this.spawnZ);
-            
-            // 3. Terapkan Rotasi Spawn
-            // (Kita tambah Math.PI jika model aslinya menghadap belakang, sesuaikan jika perlu)
             this.model.rotation.y = this.spawnRotation; 
-
             this.model.scale.set(1.3, 1.3, 1.3);
 
             const wheelsFound = [];
@@ -121,8 +123,8 @@ export class Car {
                 wheelMesh.scale.set(1, 1, 1);
                 wheelGroup.add(wheelMesh);
                 this.wheels.push({
-                    mesh: wheelMesh,    // Rotasi X
-                    group: wheelGroup,  // Rotasi Y
+                    mesh: wheelMesh,    
+                    group: wheelGroup,  
                     isFront: wheelMesh.name.toLowerCase().includes('front')
                 });
             });
@@ -138,7 +140,6 @@ export class Car {
         });
     }
 
-    // ... (Sisa method setupRearLights, updateLightsState, dll TETAP SAMA) ...
     setupRearLights() {
         const createLightMesh = (color, x, y, z) => {
             const material = new THREE.MeshStandardMaterial({
@@ -183,14 +184,16 @@ export class Car {
     update(dummyCars, borders) { 
         if (!this.model) return;
 
-        // 1. Simpan posisi sebelum gerak
         const oldPosition = this.model.position.clone();
         const oldRotation = this.model.rotation.y;
 
-        // 2. Logika Input & Gerak (TETAP SAMA)
         let visualBrake = false;
         let visualReverse = false;
         const currentAccel = this.baseAcceleration * this.getTorqueFactor();
+
+        if (this.audioManager) {
+            this.audioManager.updateEngine(this.speed, this.maxSpeed);
+        }
 
         if (Math.abs(this.speed) < 0.0001) {
             this.speed = 0; this.stoppedFrameCount++; 
@@ -198,14 +201,18 @@ export class Car {
             this.stoppedFrameCount = 0;
         }
 
+        let isBrakingInput = false;
+
         if (this.keys.space) {
             this.speed *= 0.85; 
             if (Math.abs(this.speed) < 0.0005) this.speed = 0;
             visualBrake = true;
+            isBrakingInput = true;
         } else {
             if (this.keys.w) {
                 if (this.speed < 0) { 
                     this.speed += this.brakeForce; 
+                    isBrakingInput = true;
                     if (this.speed > 0) this.speed = 0;
                     visualBrake = true; visualReverse = true;
                 } else { 
@@ -215,6 +222,7 @@ export class Car {
             if (this.keys.s) {
                 if (this.speed > 0) { 
                     this.speed -= this.brakeForce;
+                    isBrakingInput = true;
                     if (this.speed < 0) this.speed = 0;
                     visualBrake = true;
                 } else { 
@@ -228,12 +236,19 @@ export class Car {
             }
         }
 
+        if (this.audioManager) {
+            if (isBrakingInput && Math.abs(this.speed) > 0.01) {
+                this.audioManager.playBrake();
+            } else {
+                this.audioManager.stopBrake();
+            }
+        }
+
         if (this.speed > this.maxSpeed) this.speed = this.maxSpeed;
         if (this.speed < -this.maxReverseSpeed) this.speed = -this.maxReverseSpeed;
 
         this.updateLightsState(visualBrake, visualReverse);
 
-        // Steering
         let targetSteering = 0;
         if (this.keys.a) targetSteering = this.maxSteeringAngle;
         if (this.keys.d) targetSteering = -this.maxSteeringAngle;
@@ -245,14 +260,12 @@ export class Car {
             this.model.translateZ(this.speed);
         }
 
-        // Update Roda
         const wheelRotationSpeed = this.speed * 8; 
         this.wheels.forEach(w => {
             w.mesh.rotation.x += wheelRotationSpeed;
             if(w.isFront) w.group.rotation.y = this.currentSteering;
         });
 
-        // 3. Update Hitbox (OBB) Player
         this.obb.center.copy(this.model.position);
         this.obb.center.y += 1; 
         const rotationMatrix = new THREE.Matrix4();
@@ -264,12 +277,8 @@ export class Car {
             this.debugMesh.rotation.y = this.model.rotation.y;
         }
 
-        // ==========================================
-        // 4. CEK TABRAKAN (COLLISION CHECK)
-        // ==========================================
         let isCollided = false;
 
-        // A. Cek Tabrakan dengan DUMMY CARS
         if (dummyCars && Array.isArray(dummyCars)) {
             for (const dummy of dummyCars) {
                 if (dummy.obb && dummy.mesh) {
@@ -282,7 +291,6 @@ export class Car {
             }
         }
 
-        // B. Cek Tabrakan dengan BORDERS (Pagar)
         if (!isCollided && borders && Array.isArray(borders)) {
             for (const borderOBB of borders) {
                 if (this.obb.intersectsOBB(borderOBB)) {
@@ -293,17 +301,18 @@ export class Car {
             }
         }
 
-        // C. JIKA TERJADI TABRAKAN
         if (isCollided) {
-             // a. Undo Movement
+            if (this.audioManager) {
+                if (Math.abs(this.speed) > 0.005) { 
+                   this.audioManager.playCrash();
+                }
+            }
              this.model.position.copy(oldPosition);
              this.model.rotation.y = oldRotation;
 
-             // b. Bounce effect
              this.speed = -this.speed * 0.3;
              if(Math.abs(this.speed) < 0.001) this.speed = 0;
 
-             // c. Sync OBB kembali
              this.obb.center.copy(this.model.position);
              this.obb.center.y += 1;
              const undoRotMatrix = new THREE.Matrix4();
@@ -315,7 +324,6 @@ export class Car {
         this.updateCameras();
     }
     
-    // ... (Sisa class Car sama seperti sebelumnya) ...
     updateCameras() {
         let relativeOffset = new THREE.Vector3();
         let lookAtTarget = new THREE.Vector3();

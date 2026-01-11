@@ -17,9 +17,15 @@
 </head>
 <body>
 
+  <div id="loading-screen">
+      <div class="loader"></div>
+      <div class="loading-text">MEMUAT ASET...</div>
+  </div>
   <button id="debugBtn" class="hud-btn">Hitbox: OFF</button>
   <button id="fullscreenBtn" class="hud-btn">⛶ Full Screen</button>
   <button id="respawnBtn" class="hud-btn" style="top: 60px;">↻ Respawn</button>
+
+  <button id="soundBtn" class="hud-btn" style="top: 60px; width: auto;">🔊 Sound: ON</button>
 
   <div id="tutorialPopup">
     <div class="popup-content">
@@ -31,6 +37,8 @@
             <div class="key-row"><span>Mundur</span> <kbd>S</kbd></div>
             <div class="key-row"><span>Belok Kiri</span> <kbd>A</kbd></div>
             <div class="key-row"><span>Belok Kanan</span> <kbd>D</kbd></div>
+            
+            <div class="key-row"><span>Rem Tangan</span> <kbd style="min-width: 60px;">Space</kbd></div>
             
             <div style="height: 1px; background: rgba(255,255,255,0.1); margin: 8px 0;"></div>
 
@@ -48,7 +56,7 @@
   </div>
 
   <script src="./js/ui.js"></script>
-  
   <script type="module" src="./main.js"></script>
+
 </body>
 </html>

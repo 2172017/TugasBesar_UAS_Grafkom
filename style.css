@@ -159,6 +159,51 @@ body, html {
     left: 10px;
   }
   
-  #fullscreenBtn {
+  #fullscreenBtn, #soundBtn {
     right: 10px; /* Di pojok kanan atas */
+  }
+
+  #loading-screen {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: #000;
+    color: white;
+    display: flex;
+    flex-direction: column; /* Agar spinner dan teks vertikal */
+    justify-content: center;
+    align-items: center;
+    z-index: 10000; /* LEBIH TINGGI dari Tutorial (9999) */
+    transition: opacity 0.5s;
+    user-select: none; /* Supaya teks tidak terblok saat diklik */
+  }
+
+  /* Tambahkan class ini nanti lewat JS saat loading selesai */
+  .cursor-pointer {
+      cursor: pointer !important;
+  }
+
+  /* Icon Putar (Spinner) */
+  .loader {
+    border: 8px solid #444; /* Lingkaran redup */
+    border-top: 8px solid #f3f3f3; /* Bagian yang berputar */
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    animation: putar 1s linear infinite;
+    margin-bottom: 20px;
+  }
+
+  /* Teks Loading (Opsional, bisa dihapus jika mau icon saja) */
+  .loading-text {
+      color: #f3f3f3;
+      font-family: sans-serif;
+      font-size: 1.2rem;
+      letter-spacing: 2px;
+  }
+
+  /* Animasi Putar */
+  @keyframes putar {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
   }
